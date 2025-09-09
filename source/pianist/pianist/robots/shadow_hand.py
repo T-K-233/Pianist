@@ -8,7 +8,7 @@ from isaaclab.assets.articulation import ArticulationCfg
 
 SHADOW_HAND_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path="./source/pianist/data/robots/shadow_hand/usd/left_hand.usd",
+        usd_path="./source/pianist/data/robots/shadow_hand/usd/left_hand_translation.usd",
         activate_contact_sensors=False,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=True,
@@ -35,11 +35,13 @@ SHADOW_HAND_CFG = ArticulationCfg(
     actuators={
         "fingers": ImplicitActuatorCfg(
             joint_names_expr=[
+                "WRJ(X|Y)",
                 "WRJ(2|1)",
                 "(LF|TH)J5",
                 "(FF|MF|RF|LF|TH)J(4|3|2)",
             ],
             effort_limit_sim={
+                "WRJ(X|Y)": 5,
                 "WRJ2": 4.785,
                 "WRJ1": 2.175,
                 "LFJ5": 0.9,
@@ -50,11 +52,13 @@ SHADOW_HAND_CFG = ArticulationCfg(
                 "THJ(3|2)": 0.99,
             },
             stiffness={
+                "WRJ(X|Y)": 5.0,
                 "WRJ(2|1)": 5.0,
                 "(LF|TH)J5": 1.0,
                 "(FF|MF|RF|LF|TH)J(4|3|2)": 1.0,
             },
             damping={
+                "WRJ(X|Y)": 0.5,
                 "WRJ(2|1)": 0.5,
                 "(LF|TH)J5": 0.1,
                 "(FF|MF|RF|LF|TH)J(4|3|2)": 0.1,

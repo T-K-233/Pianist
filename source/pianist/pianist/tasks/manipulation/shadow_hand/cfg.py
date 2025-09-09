@@ -113,7 +113,7 @@ class ShadowHandEnvCfg(DirectRLEnvCfg):
     # env
     decimation = 2
     episode_length_s = 10.0
-    action_space = 19
+    action_space = 21
     observation_space = 157  # (full)
     state_space = 0
     asymmetric_obs = False
@@ -139,6 +139,8 @@ class ShadowHandEnvCfg(DirectRLEnvCfg):
         )
     )
     actuated_joint_names = [
+        "WRJX",
+        "WRJY",
         "WRJ2",
         "WRJ1",
         "FFJ4",
