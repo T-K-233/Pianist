@@ -1,0 +1,17 @@
+[project]
+name = "pianist"
+version = "0.1.0"
+description = "Pianist"
+requires-python = ">=3.10,<3.11"
+license = "MIT"
+authors = [
+  { name = "-T.K.-" },
+]
+dependencies = [
+  "isaacsim[all,extscache]==4.5.0",
+  "isaaclab[isaacsim,all]==2.1.0",
+]
+
+[build-system]
+requires = ["setuptools", "wheel", "toml"]
+build-backend = "setuptools.build_meta"
