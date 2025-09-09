@@ -1,11 +1,3 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
-# All rights reserved.
-#
-# SPDX-License-Identifier: BSD-3-Clause
-
-
-from isaaclab_assets.robots.shadow_hand import SHADOW_HAND_CFG
-
 import isaaclab.envs.mdp as mdp
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, RigidObjectCfg
@@ -19,6 +11,8 @@ from isaaclab.sim.spawners.materials.physics_materials_cfg import RigidBodyMater
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 from isaaclab.utils.noise import GaussianNoiseCfg, NoiseModelWithAdditiveBiasCfg
+
+from pianist.robots.shadow_hand import SHADOW_HAND_CFG
 
 
 @configclass
@@ -119,7 +113,7 @@ class ShadowHandEnvCfg(DirectRLEnvCfg):
     # env
     decimation = 2
     episode_length_s = 10.0
-    action_space = 20
+    action_space = 19
     observation_space = 157  # (full)
     state_space = 0
     asymmetric_obs = False
@@ -137,7 +131,7 @@ class ShadowHandEnvCfg(DirectRLEnvCfg):
         ),
     )
     # robot
-    robot_cfg: ArticulationCfg = SHADOW_HAND_CFG.replace(prim_path="/World/envs/env_.*/Robot").replace(
+    robot_cfg: ArticulationCfg = SHADOW_HAND_CFG.replace(prim_path="/World/envs/env_.*/robot").replace(
         init_state=ArticulationCfg.InitialStateCfg(
             pos=(0.0, 0.0, 0.5),
             rot=(1.0, 0.0, 0.0, 0.0),
@@ -145,33 +139,32 @@ class ShadowHandEnvCfg(DirectRLEnvCfg):
         )
     )
     actuated_joint_names = [
-        "robot0_WRJ1",
-        "robot0_WRJ0",
-        "robot0_FFJ3",
-        "robot0_FFJ2",
-        "robot0_FFJ1",
-        "robot0_MFJ3",
-        "robot0_MFJ2",
-        "robot0_MFJ1",
-        "robot0_RFJ3",
-        "robot0_RFJ2",
-        "robot0_RFJ1",
-        "robot0_LFJ4",
-        "robot0_LFJ3",
-        "robot0_LFJ2",
-        "robot0_LFJ1",
-        "robot0_THJ4",
-        "robot0_THJ3",
-        "robot0_THJ2",
-        "robot0_THJ1",
-        "robot0_THJ0",
+        "WRJ2",
+        "WRJ1",
+        "FFJ4",
+        "FFJ3",
+        "FFJ2",
+        "MFJ4",
+        "MFJ3",
+        "MFJ2",
+        "RFJ4",
+        "RFJ3",
+        "RFJ2",
+        "LFJ5",
+        "LFJ4",
+        "LFJ3",
+        "LFJ2",
+        "THJ5",
+        "THJ4",
+        "THJ3",
+        "THJ2",
     ]
     fingertip_body_names = [
-        "robot0_ffdistal",
-        "robot0_mfdistal",
-        "robot0_rfdistal",
-        "robot0_lfdistal",
-        "robot0_thdistal",
+        "ffdistal",
+        "mfdistal",
+        "rfdistal",
+        "lfdistal",
+        "thdistal",
     ]
 
     # in-hand object
