@@ -2,10 +2,9 @@
 
 """Programatically build a piano URDF model."""
 
-import os
 from pathlib import Path
 
-import piano_constants as consts
+import pianist.assets.piano_constants as consts
 
 
 def build(add_actuators: bool = False) -> str:

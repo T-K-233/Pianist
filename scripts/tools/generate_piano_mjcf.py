@@ -15,13 +15,12 @@
 """Programatically build a piano MJCF model."""
 
 import math
-import os
 from pathlib import Path
 
 from dm_control import mjcf
 from mujoco_utils import types
 
-import piano_constants as consts
+import pianist.assets.piano_constants as consts
 
 
 def build(add_actuators: bool = False) -> types.MjcfRootElement:
