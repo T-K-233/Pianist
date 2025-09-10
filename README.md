@@ -9,7 +9,8 @@ uv run ./scripts/tools/convert_urdf_to_usd.py ./source/pianist/data/robots/shado
 
 Generate piano
 ```bash
-uv run ./scripts/tools/convert_piano_mjcf_to_urdf.py ./source/pianist/data/assets/piano/urdf/piano.xml
+uv run ./scripts/tools/generate_piano_mjcf.py
+uv run ./scripts/tools/generate_piano_urdf.py
 uv run ./scripts/tools/convert_urdf_to_usd.py ./source/pianist/data/assets/piano/urdf/piano.urdf ./source/pianist/data/assets/piano/usd/piano.usd --fix-base
 ```
 

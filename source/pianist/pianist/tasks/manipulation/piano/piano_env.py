@@ -16,6 +16,7 @@ from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
 import pianist.tasks.manipulation.piano.mdp as mdp
+from pianist.assets.piano import PIANO_CFG
 
 
 @configclass
@@ -29,24 +30,7 @@ class PianoSceneCfg(InteractiveSceneCfg):
         init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, -1.05)),
     )
 
-    piano = ArticulationCfg(
-        prim_path="{ENV_REGEX_NS}/piano",
-        spawn=sim_utils.UsdFileCfg(
-            usd_path="source/pianist/data/assets/piano/usd/piano.usd",
-        ),
-        init_state=ArticulationCfg.InitialStateCfg(
-            pos=(0.4, 0.0, 0.5),
-            rot=(0.0, 0.0, 0.0, 1.0),
-        ),
-        actuators={
-            ".*": ImplicitActuatorCfg(
-                joint_names_expr=[".*"],
-                effort_limit_sim={".*": 0.0},
-                stiffness={".*": 0.0},
-                damping={".*": 0.1},
-            ),
-        },
-    )
+    piano = PIANO_CFG.replace(prim_path="{ENV_REGEX_NS}/piano")
 
     # robots
     robot: ArticulationCfg = MISSING

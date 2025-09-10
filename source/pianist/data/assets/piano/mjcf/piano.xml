@@ -5,18 +5,15 @@
       <joint type="hinge" axis="0 1 0"/>
       <geom type="box" contype="0" conaffinity="1"/>
       <site type="box" group="4" rgba="1 0 0 1"/>
-      <general dyntype="none" gaintype="fixed" biastype="none" dynprm="1 0 0" gainprm="1 0 0" biasprm="0 0 0"/>
       <default class="white_key">
         <joint pos="-0.074999999999999997 0 0" stiffness="2" range="0 0.066568163775823808" springref="-0.017453292519943295" armature="0.001" damping="0.050000000000000003"/>
         <geom size="0.074999999999999997 0.01125 0.01125" material="white" mass="0.040000000000000001"/>
         <site size="0.074999999999999997 0.01125 0.01125"/>
-        <general ctrlrange="0 0.066568163775823808"/>
       </default>
       <default class="black_key">
         <joint pos="-0.044999999999999998 0 0" stiffness="2" range="0 0.088655881867437475" springref="-0.017453292519943295" armature="0.001" damping="0.050000000000000003"/>
         <geom size="0.044999999999999998 0.0050000000000000001 0.0089999999999999993" material="black" mass="0.02"/>
         <site size="0.044999999999999998 0.0050000000000000001 0.0089999999999999993"/>
-        <general ctrlrange="0 0.088655881867437475"/>
       </default>
     </default>
   </default>
@@ -469,94 +466,4 @@
       <site name="white_key_site_87" class="white_key"/>
     </body>
   </worldbody>
-  <actuator>
-    <general name="white_actuator_0" class="white_key" joint="white_joint_0"/>
-    <general name="black_actuator_1" class="black_key" joint="black_joint_1"/>
-    <general name="white_actuator_2" class="white_key" joint="white_joint_2"/>
-    <general name="white_actuator_3" class="white_key" joint="white_joint_3"/>
-    <general name="black_actuator_4" class="black_key" joint="black_joint_4"/>
-    <general name="white_actuator_5" class="white_key" joint="white_joint_5"/>
-    <general name="black_actuator_6" class="black_key" joint="black_joint_6"/>
-    <general name="white_actuator_7" class="white_key" joint="white_joint_7"/>
-    <general name="white_actuator_8" class="white_key" joint="white_joint_8"/>
-    <general name="black_actuator_9" class="black_key" joint="black_joint_9"/>
-    <general name="white_actuator_10" class="white_key" joint="white_joint_10"/>
-    <general name="black_actuator_11" class="black_key" joint="black_joint_11"/>
-    <general name="white_actuator_12" class="white_key" joint="white_joint_12"/>
-    <general name="black_actuator_13" class="black_key" joint="black_joint_13"/>
-    <general name="white_actuator_14" class="white_key" joint="white_joint_14"/>
-    <general name="white_actuator_15" class="white_key" joint="white_joint_15"/>
-    <general name="black_actuator_16" class="black_key" joint="black_joint_16"/>
-    <general name="white_actuator_17" class="white_key" joint="white_joint_17"/>
-    <general name="black_actuator_18" class="black_key" joint="black_joint_18"/>
-    <general name="white_actuator_19" class="white_key" joint="white_joint_19"/>
-    <general name="white_actuator_20" class="white_key" joint="white_joint_20"/>
-    <general name="black_actuator_21" class="black_key" joint="black_joint_21"/>
-    <general name="white_actuator_22" class="white_key" joint="white_joint_22"/>
-    <general name="black_actuator_23" class="black_key" joint="black_joint_23"/>
-    <general name="white_actuator_24" class="white_key" joint="white_joint_24"/>
-    <general name="black_actuator_25" class="black_key" joint="black_joint_25"/>
-    <general name="white_actuator_26" class="white_key" joint="white_joint_26"/>
-    <general name="white_actuator_27" class="white_key" joint="white_joint_27"/>
-    <general name="black_actuator_28" class="black_key" joint="black_joint_28"/>
-    <general name="white_actuator_29" class="white_key" joint="white_joint_29"/>
-    <general name="black_actuator_30" class="black_key" joint="black_joint_30"/>
-    <general name="white_actuator_31" class="white_key" joint="white_joint_31"/>
-    <general name="white_actuator_32" class="white_key" joint="white_joint_32"/>
-    <general name="black_actuator_33" class="black_key" joint="black_joint_33"/>
-    <general name="white_actuator_34" class="white_key" joint="white_joint_34"/>
-    <general name="black_actuator_35" class="black_key" joint="black_joint_35"/>
-    <general name="white_actuator_36" class="white_key" joint="white_joint_36"/>
-    <general name="black_actuator_37" class="black_key" joint="black_joint_37"/>
-    <general name="white_actuator_38" class="white_key" joint="white_joint_38"/>
-    <general name="white_actuator_39" class="white_key" joint="white_joint_39"/>
-    <general name="black_actuator_40" class="black_key" joint="black_joint_40"/>
-    <general name="white_actuator_41" class="white_key" joint="white_joint_41"/>
-    <general name="black_actuator_42" class="black_key" joint="black_joint_42"/>
-    <general name="white_actuator_43" class="white_key" joint="white_joint_43"/>
-    <general name="white_actuator_44" class="white_key" joint="white_joint_44"/>
-    <general name="black_actuator_45" class="black_key" joint="black_joint_45"/>
-    <general name="white_actuator_46" class="white_key" joint="white_joint_46"/>
-    <general name="black_actuator_47" class="black_key" joint="black_joint_47"/>
-    <general name="white_actuator_48" class="white_key" joint="white_joint_48"/>
-    <general name="black_actuator_49" class="black_key" joint="black_joint_49"/>
-    <general name="white_actuator_50" class="white_key" joint="white_joint_50"/>
-    <general name="white_actuator_51" class="white_key" joint="white_joint_51"/>
-    <general name="black_actuator_52" class="black_key" joint="black_joint_52"/>
-    <general name="white_actuator_53" class="white_key" joint="white_joint_53"/>
-    <general name="black_actuator_54" class="black_key" joint="black_joint_54"/>
-    <general name="white_actuator_55" class="white_key" joint="white_joint_55"/>
-    <general name="white_actuator_56" class="white_key" joint="white_joint_56"/>
-    <general name="black_actuator_57" class="black_key" joint="black_joint_57"/>
-    <general name="white_actuator_58" class="white_key" joint="white_joint_58"/>
-    <general name="black_actuator_59" class="black_key" joint="black_joint_59"/>
-    <general name="white_actuator_60" class="white_key" joint="white_joint_60"/>
-    <general name="black_actuator_61" class="black_key" joint="black_joint_61"/>
-    <general name="white_actuator_62" class="white_key" joint="white_joint_62"/>
-    <general name="white_actuator_63" class="white_key" joint="white_joint_63"/>
-    <general name="black_actuator_64" class="black_key" joint="black_joint_64"/>
-    <general name="white_actuator_65" class="white_key" joint="white_joint_65"/>
-    <general name="black_actuator_66" class="black_key" joint="black_joint_66"/>
-    <general name="white_actuator_67" class="white_key" joint="white_joint_67"/>
-    <general name="white_actuator_68" class="white_key" joint="white_joint_68"/>
-    <general name="black_actuator_69" class="black_key" joint="black_joint_69"/>
-    <general name="white_actuator_70" class="white_key" joint="white_joint_70"/>
-    <general name="black_actuator_71" class="black_key" joint="black_joint_71"/>
-    <general name="white_actuator_72" class="white_key" joint="white_joint_72"/>
-    <general name="black_actuator_73" class="black_key" joint="black_joint_73"/>
-    <general name="white_actuator_74" class="white_key" joint="white_joint_74"/>
-    <general name="white_actuator_75" class="white_key" joint="white_joint_75"/>
-    <general name="black_actuator_76" class="black_key" joint="black_joint_76"/>
-    <general name="white_actuator_77" class="white_key" joint="white_joint_77"/>
-    <general name="black_actuator_78" class="black_key" joint="black_joint_78"/>
-    <general name="white_actuator_79" class="white_key" joint="white_joint_79"/>
-    <general name="white_actuator_80" class="white_key" joint="white_joint_80"/>
-    <general name="black_actuator_81" class="black_key" joint="black_joint_81"/>
-    <general name="white_actuator_82" class="white_key" joint="white_joint_82"/>
-    <general name="black_actuator_83" class="black_key" joint="black_joint_83"/>
-    <general name="white_actuator_84" class="white_key" joint="white_joint_84"/>
-    <general name="black_actuator_85" class="black_key" joint="black_joint_85"/>
-    <general name="white_actuator_86" class="white_key" joint="white_joint_86"/>
-    <general name="white_actuator_87" class="white_key" joint="white_joint_87"/>
-  </actuator>
 </mujoco>
