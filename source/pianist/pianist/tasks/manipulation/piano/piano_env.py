@@ -1,7 +1,8 @@
 from dataclasses import MISSING
 
 import isaaclab.sim as sim_utils
-from isaaclab.assets import ArticulationCfg, RigidObjectCfg
+from isaaclab.actuators.actuator_cfg import ImplicitActuatorCfg
+from isaaclab.assets import ArticulationCfg
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import EventTermCfg as EventTerm
@@ -12,7 +13,6 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.utils import configclass
-from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
 import pianist.tasks.manipulation.piano.mdp as mdp
@@ -29,31 +29,23 @@ class PianoSceneCfg(InteractiveSceneCfg):
         init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, -1.05)),
     )
 
-    object_cfg: RigidObjectCfg = RigidObjectCfg(
-        prim_path="/World/envs/env_.*/object",
+    piano = ArticulationCfg(
+        prim_path="{ENV_REGEX_NS}/piano",
         spawn=sim_utils.UsdFileCfg(
-            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/DexCube/dex_cube_instanceable.usd",
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(
-                kinematic_enabled=False,
-                disable_gravity=False,
-                enable_gyroscopic_forces=True,
-                solver_position_iteration_count=8,
-                solver_velocity_iteration_count=0,
-                sleep_threshold=0.005,
-                stabilization_threshold=0.0025,
-                max_depenetration_velocity=1000.0,
+            usd_path="source/pianist/data/assets/piano/usd/piano.usd",
+        ),
+        init_state=ArticulationCfg.InitialStateCfg(
+            pos=(0.4, 0.0, 0.5),
+            rot=(0.0, 0.0, 0.0, 1.0),
+        ),
+        actuators={
+            ".*": ImplicitActuatorCfg(
+                joint_names_expr=[".*"],
+                effort_limit_sim={".*": 0.0},
+                stiffness={".*": 0.0},
+                damping={".*": 0.1},
             ),
-            mass_props=sim_utils.MassPropertiesCfg(density=567.0),
-        ),
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, -0.39, 0.6), rot=(1.0, 0.0, 0.0, 0.0)),
-    )
-
-    table = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/Table",
-        spawn=sim_utils.UsdFileCfg(
-            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Mounts/SeattleLabTable/table_instanceable.usd",
-        ),
-        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.55, 0.0, 0.0), rot=(0.70711, 0.0, 0.0, 0.70711)),
+        },
     )
 
     # robots
@@ -74,19 +66,10 @@ class PianoSceneCfg(InteractiveSceneCfg):
 class CommandsCfg:
     """Command terms for the MDP."""
 
-    ee_pose = mdp.UniformPoseCommandCfg(
+    ee_pose = mdp.KeyPressCommandCfg(
         asset_name="robot",
-        body_name=MISSING,
-        resampling_time_range=(4.0, 4.0),
+        resampling_time_range=(1.0, 4.0),
         debug_vis=True,
-        ranges=mdp.UniformPoseCommandCfg.Ranges(
-            pos_x=(0.4, 0.4),
-            pos_y=(-0.4, 0.4),
-            pos_z=(-0.05, -0.05),
-            roll=(0.0, 0.0),
-            pitch=(0.0, 0.0),
-            yaw=(0.0, 0.0),
-        ),
     )
 
 @configclass
@@ -132,12 +115,12 @@ class RewardsCfg:
     end_effector_position_tracking = RewTerm(
         func=mdp.position_command_error,
         weight=-0.2,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "command_name": "ee_pose"},
+        params={"asset_cfg": SceneEntityCfg("robot", body_names=["ffdistal"]), "command_name": "ee_pose"},
     )
     end_effector_position_tracking_fine_grained = RewTerm(
         func=mdp.position_command_error_tanh,
         weight=0.1,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "std": 0.1, "command_name": "ee_pose"},
+        params={"asset_cfg": SceneEntityCfg("robot", body_names=["ffdistal"]), "std": 0.1, "command_name": "ee_pose"},
     )
     # end_effector_orientation_tracking = RewTerm(
     #     func=mdp.orientation_command_error,
@@ -183,7 +166,7 @@ class EventCfg:
 class PianoEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the piano environment."""
     # Scene settings
-    scene: PianoSceneCfg = PianoSceneCfg(num_envs=4096, env_spacing=2.5)
+    scene: PianoSceneCfg = PianoSceneCfg(num_envs=1024, env_spacing=2.5)
 
     # Policy commands
     commands: CommandsCfg = CommandsCfg()

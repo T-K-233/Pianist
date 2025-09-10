@@ -27,4 +27,3 @@ class ShadowHandCfg(PianoEnvCfg):
 
         # override command generator body
         # end-effector is along z-direction
-        self.commands.ee_pose.body_name = "ffdistal"
