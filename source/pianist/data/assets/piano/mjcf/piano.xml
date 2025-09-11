@@ -1,0 +1,469 @@
+<mujoco model="piano">
+  <compiler autolimits="true" angle="radian"/>
+  <default>
+    <default class="/">
+      <joint type="hinge" axis="0 1 0"/>
+      <geom type="box" contype="0" conaffinity="1"/>
+      <site type="box" group="4" rgba="1 0 0 1"/>
+      <default class="white_key">
+        <joint pos="-0.074999999999999997 0 0" stiffness="2" range="0 0.066568163775823808" springref="-0.017453292519943295" armature="0.001" damping="0.050000000000000003"/>
+        <geom size="0.074999999999999997 0.01125 0.01125" material="white" mass="0.040000000000000001"/>
+        <site size="0.074999999999999997 0.01125 0.01125"/>
+      </default>
+      <default class="black_key">
+        <joint pos="-0.044999999999999998 0 0" stiffness="2" range="0 0.088655881867437475" springref="-0.017453292519943295" armature="0.001" damping="0.050000000000000003"/>
+        <geom size="0.044999999999999998 0.0050000000000000001 0.0089999999999999993" material="black" mass="0.02"/>
+        <site size="0.044999999999999998 0.0050000000000000001 0.0089999999999999993"/>
+      </default>
+    </default>
+  </default>
+  <asset>
+    <material name="white" class="/" rgba="0.90000000000000002 0.90000000000000002 0.90000000000000002 1"/>
+    <material name="black" class="/" rgba="0.10000000000000001 0.10000000000000001 0.10000000000000001 1"/>
+  </asset>
+  <worldbody>
+    <body name="base" pos="-0.127 0 0.02">
+      <geom name="//unnamed_geom_0" class="/" type="box" size="0.050000000000000003 0.61049999999999993 0.02" rgba="0.14999999999999999 0.14999999999999999 0.14999999999999999 1"/>
+    </body>
+    <body name="white_key_0" pos="0 -0.59924999999999995 0.01125">
+      <geom name="white_key_geom_0" class="white_key"/>
+      <joint name="white_joint_0" class="white_key"/>
+      <site name="white_key_site_0" class="white_key"/>
+    </body>
+    <body name="black_key_1" pos="-0.029999999999999999 -0.58750000000000002 0.026000000000000002">
+      <geom name="black_key_geom_1" class="black_key"/>
+      <joint name="black_joint_1" class="black_key"/>
+      <site name="black_key_site_1" class="black_key"/>
+    </body>
+    <body name="white_key_2" pos="0 -0.57574999999999998 0.01125">
+      <geom name="white_key_geom_2" class="white_key"/>
+      <joint name="white_joint_2" class="white_key"/>
+      <site name="white_key_site_2" class="white_key"/>
+    </body>
+    <body name="white_key_3" pos="0 -0.55224999999999991 0.01125">
+      <geom name="white_key_geom_3" class="white_key"/>
+      <joint name="white_joint_3" class="white_key"/>
+      <site name="white_key_site_3" class="white_key"/>
+    </body>
+    <body name="black_key_4" pos="-0.029999999999999999 -0.53999999999999992 0.026000000000000002">
+      <geom name="black_key_geom_4" class="black_key"/>
+      <joint name="black_joint_4" class="black_key"/>
+      <site name="black_key_site_4" class="black_key"/>
+    </body>
+    <body name="white_key_5" pos="0 -0.52874999999999994 0.01125">
+      <geom name="white_key_geom_5" class="white_key"/>
+      <joint name="white_joint_5" class="white_key"/>
+      <site name="white_key_site_5" class="white_key"/>
+    </body>
+    <body name="black_key_6" pos="-0.029999999999999999 -0.51649999999999985 0.026000000000000002">
+      <geom name="black_key_geom_6" class="black_key"/>
+      <joint name="black_joint_6" class="black_key"/>
+      <site name="black_key_site_6" class="black_key"/>
+    </body>
+    <body name="white_key_7" pos="0 -0.50524999999999998 0.01125">
+      <geom name="white_key_geom_7" class="white_key"/>
+      <joint name="white_joint_7" class="white_key"/>
+      <site name="white_key_site_7" class="white_key"/>
+    </body>
+    <body name="white_key_8" pos="0 -0.48174999999999996 0.01125">
+      <geom name="white_key_geom_8" class="white_key"/>
+      <joint name="white_joint_8" class="white_key"/>
+      <site name="white_key_site_8" class="white_key"/>
+    </body>
+    <body name="black_key_9" pos="-0.029999999999999999 -0.46949999999999997 0.026000000000000002">
+      <geom name="black_key_geom_9" class="black_key"/>
+      <joint name="black_joint_9" class="black_key"/>
+      <site name="black_key_site_9" class="black_key"/>
+    </body>
+    <body name="white_key_10" pos="0 -0.45824999999999994 0.01125">
+      <geom name="white_key_geom_10" class="white_key"/>
+      <joint name="white_joint_10" class="white_key"/>
+      <site name="white_key_site_10" class="white_key"/>
+    </body>
+    <body name="black_key_11" pos="-0.029999999999999999 -0.4459999999999999 0.026000000000000002">
+      <geom name="black_key_geom_11" class="black_key"/>
+      <joint name="black_joint_11" class="black_key"/>
+      <site name="black_key_site_11" class="black_key"/>
+    </body>
+    <body name="white_key_12" pos="0 -0.43474999999999997 0.01125">
+      <geom name="white_key_geom_12" class="white_key"/>
+      <joint name="white_joint_12" class="white_key"/>
+      <site name="white_key_site_12" class="white_key"/>
+    </body>
+    <body name="black_key_13" pos="-0.029999999999999999 -0.42249999999999993 0.026000000000000002">
+      <geom name="black_key_geom_13" class="black_key"/>
+      <joint name="black_joint_13" class="black_key"/>
+      <site name="black_key_site_13" class="black_key"/>
+    </body>
+    <body name="white_key_14" pos="0 -0.41124999999999995 0.01125">
+      <geom name="white_key_geom_14" class="white_key"/>
+      <joint name="white_joint_14" class="white_key"/>
+      <site name="white_key_site_14" class="white_key"/>
+    </body>
+    <body name="white_key_15" pos="0 -0.38774999999999993 0.01125">
+      <geom name="white_key_geom_15" class="white_key"/>
+      <joint name="white_joint_15" class="white_key"/>
+      <site name="white_key_site_15" class="white_key"/>
+    </body>
+    <body name="black_key_16" pos="-0.029999999999999999 -0.37549999999999994 0.026000000000000002">
+      <geom name="black_key_geom_16" class="black_key"/>
+      <joint name="black_joint_16" class="black_key"/>
+      <site name="black_key_site_16" class="black_key"/>
+    </body>
+    <body name="white_key_17" pos="0 -0.36424999999999996 0.01125">
+      <geom name="white_key_geom_17" class="white_key"/>
+      <joint name="white_joint_17" class="white_key"/>
+      <site name="white_key_site_17" class="white_key"/>
+    </body>
+    <body name="black_key_18" pos="-0.029999999999999999 -0.35199999999999987 0.026000000000000002">
+      <geom name="black_key_geom_18" class="black_key"/>
+      <joint name="black_joint_18" class="black_key"/>
+      <site name="black_key_site_18" class="black_key"/>
+    </body>
+    <body name="white_key_19" pos="0 -0.34074999999999994 0.01125">
+      <geom name="white_key_geom_19" class="white_key"/>
+      <joint name="white_joint_19" class="white_key"/>
+      <site name="white_key_site_19" class="white_key"/>
+    </body>
+    <body name="white_key_20" pos="0 -0.31724999999999992 0.01125">
+      <geom name="white_key_geom_20" class="white_key"/>
+      <joint name="white_joint_20" class="white_key"/>
+      <site name="white_key_site_20" class="white_key"/>
+    </body>
+    <body name="black_key_21" pos="-0.029999999999999999 -0.30499999999999994 0.026000000000000002">
+      <geom name="black_key_geom_21" class="black_key"/>
+      <joint name="black_joint_21" class="black_key"/>
+      <site name="black_key_site_21" class="black_key"/>
+    </body>
+    <body name="white_key_22" pos="0 -0.29374999999999996 0.01125">
+      <geom name="white_key_geom_22" class="white_key"/>
+      <joint name="white_joint_22" class="white_key"/>
+      <site name="white_key_site_22" class="white_key"/>
+    </body>
+    <body name="black_key_23" pos="-0.029999999999999999 -0.28149999999999986 0.026000000000000002">
+      <geom name="black_key_geom_23" class="black_key"/>
+      <joint name="black_joint_23" class="black_key"/>
+      <site name="black_key_site_23" class="black_key"/>
+    </body>
+    <body name="white_key_24" pos="0 -0.27024999999999993 0.01125">
+      <geom name="white_key_geom_24" class="white_key"/>
+      <joint name="white_joint_24" class="white_key"/>
+      <site name="white_key_site_24" class="white_key"/>
+    </body>
+    <body name="black_key_25" pos="-0.029999999999999999 -0.2579999999999999 0.026000000000000002">
+      <geom name="black_key_geom_25" class="black_key"/>
+      <joint name="black_joint_25" class="black_key"/>
+      <site name="black_key_site_25" class="black_key"/>
+    </body>
+    <body name="white_key_26" pos="0 -0.24674999999999997 0.01125">
+      <geom name="white_key_geom_26" class="white_key"/>
+      <joint name="white_joint_26" class="white_key"/>
+      <site name="white_key_site_26" class="white_key"/>
+    </body>
+    <body name="white_key_27" pos="0 -0.22324999999999995 0.01125">
+      <geom name="white_key_geom_27" class="white_key"/>
+      <joint name="white_joint_27" class="white_key"/>
+      <site name="white_key_site_27" class="white_key"/>
+    </body>
+    <body name="black_key_28" pos="-0.029999999999999999 -0.21099999999999997 0.026000000000000002">
+      <geom name="black_key_geom_28" class="black_key"/>
+      <joint name="black_joint_28" class="black_key"/>
+      <site name="black_key_site_28" class="black_key"/>
+    </body>
+    <body name="white_key_29" pos="0 -0.19974999999999993 0.01125">
+      <geom name="white_key_geom_29" class="white_key"/>
+      <joint name="white_joint_29" class="white_key"/>
+      <site name="white_key_site_29" class="white_key"/>
+    </body>
+    <body name="black_key_30" pos="-0.029999999999999999 -0.18749999999999989 0.026000000000000002">
+      <geom name="black_key_geom_30" class="black_key"/>
+      <joint name="black_joint_30" class="black_key"/>
+      <site name="black_key_site_30" class="black_key"/>
+    </body>
+    <body name="white_key_31" pos="0 -0.17624999999999996 0.01125">
+      <geom name="white_key_geom_31" class="white_key"/>
+      <joint name="white_joint_31" class="white_key"/>
+      <site name="white_key_site_31" class="white_key"/>
+    </body>
+    <body name="white_key_32" pos="0 -0.15274999999999994 0.01125">
+      <geom name="white_key_geom_32" class="white_key"/>
+      <joint name="white_joint_32" class="white_key"/>
+      <site name="white_key_site_32" class="white_key"/>
+    </body>
+    <body name="black_key_33" pos="-0.029999999999999999 -0.14049999999999996 0.026000000000000002">
+      <geom name="black_key_geom_33" class="black_key"/>
+      <joint name="black_joint_33" class="black_key"/>
+      <site name="black_key_site_33" class="black_key"/>
+    </body>
+    <body name="white_key_34" pos="0 -0.12924999999999998 0.01125">
+      <geom name="white_key_geom_34" class="white_key"/>
+      <joint name="white_joint_34" class="white_key"/>
+      <site name="white_key_site_34" class="white_key"/>
+    </body>
+    <body name="black_key_35" pos="-0.029999999999999999 -0.11699999999999988 0.026000000000000002">
+      <geom name="black_key_geom_35" class="black_key"/>
+      <joint name="black_joint_35" class="black_key"/>
+      <site name="black_key_site_35" class="black_key"/>
+    </body>
+    <body name="white_key_36" pos="0 -0.10574999999999996 0.01125">
+      <geom name="white_key_geom_36" class="white_key"/>
+      <joint name="white_joint_36" class="white_key"/>
+      <site name="white_key_site_36" class="white_key"/>
+    </body>
+    <body name="black_key_37" pos="-0.029999999999999999 -0.093499999999999917 0.026000000000000002">
+      <geom name="black_key_geom_37" class="black_key"/>
+      <joint name="black_joint_37" class="black_key"/>
+      <site name="black_key_site_37" class="black_key"/>
+    </body>
+    <body name="white_key_38" pos="0 -0.082249999999999934 0.01125">
+      <geom name="white_key_geom_38" class="white_key"/>
+      <joint name="white_joint_38" class="white_key"/>
+      <site name="white_key_site_38" class="white_key"/>
+    </body>
+    <body name="white_key_39" pos="0 -0.058749999999999969 0.01125">
+      <geom name="white_key_geom_39" class="white_key"/>
+      <joint name="white_joint_39" class="white_key"/>
+      <site name="white_key_site_39" class="white_key"/>
+    </body>
+    <body name="black_key_40" pos="-0.029999999999999999 -0.046499999999999986 0.026000000000000002">
+      <geom name="black_key_geom_40" class="black_key"/>
+      <joint name="black_joint_40" class="black_key"/>
+      <site name="black_key_site_40" class="black_key"/>
+    </body>
+    <body name="white_key_41" pos="0 -0.035249999999999893 0.01125">
+      <geom name="white_key_geom_41" class="white_key"/>
+      <joint name="white_joint_41" class="white_key"/>
+      <site name="white_key_site_41" class="white_key"/>
+    </body>
+    <body name="black_key_42" pos="-0.029999999999999999 -0.022999999999999909 0.026000000000000002">
+      <geom name="black_key_geom_42" class="black_key"/>
+      <joint name="black_joint_42" class="black_key"/>
+      <site name="black_key_site_42" class="black_key"/>
+    </body>
+    <body name="white_key_43" pos="0 -0.011749999999999927 0.01125">
+      <geom name="white_key_geom_43" class="white_key"/>
+      <joint name="white_joint_43" class="white_key"/>
+      <site name="white_key_site_43" class="white_key"/>
+    </body>
+    <body name="white_key_44" pos="0 0.011750000000000038 0.01125">
+      <geom name="white_key_geom_44" class="white_key"/>
+      <joint name="white_joint_44" class="white_key"/>
+      <site name="white_key_site_44" class="white_key"/>
+    </body>
+    <body name="black_key_45" pos="-0.029999999999999999 0.024000000000000021 0.026000000000000002">
+      <geom name="black_key_geom_45" class="black_key"/>
+      <joint name="black_joint_45" class="black_key"/>
+      <site name="black_key_site_45" class="black_key"/>
+    </body>
+    <body name="white_key_46" pos="0 0.035250000000000004 0.01125">
+      <geom name="white_key_geom_46" class="white_key"/>
+      <joint name="white_joint_46" class="white_key"/>
+      <site name="white_key_site_46" class="white_key"/>
+    </body>
+    <body name="black_key_47" pos="-0.029999999999999999 0.047500000000000098 0.026000000000000002">
+      <geom name="black_key_geom_47" class="black_key"/>
+      <joint name="black_joint_47" class="black_key"/>
+      <site name="black_key_site_47" class="black_key"/>
+    </body>
+    <body name="white_key_48" pos="0 0.05875000000000008 0.01125">
+      <geom name="white_key_geom_48" class="white_key"/>
+      <joint name="white_joint_48" class="white_key"/>
+      <site name="white_key_site_48" class="white_key"/>
+    </body>
+    <body name="black_key_49" pos="-0.029999999999999999 0.071000000000000063 0.026000000000000002">
+      <geom name="black_key_geom_49" class="black_key"/>
+      <joint name="black_joint_49" class="black_key"/>
+      <site name="black_key_site_49" class="black_key"/>
+    </body>
+    <body name="white_key_50" pos="0 0.082250000000000045 0.01125">
+      <geom name="white_key_geom_50" class="white_key"/>
+      <joint name="white_joint_50" class="white_key"/>
+      <site name="white_key_site_50" class="white_key"/>
+    </body>
+    <body name="white_key_51" pos="0 0.10575000000000001 0.01125">
+      <geom name="white_key_geom_51" class="white_key"/>
+      <joint name="white_joint_51" class="white_key"/>
+      <site name="white_key_site_51" class="white_key"/>
+    </body>
+    <body name="black_key_52" pos="-0.029999999999999999 0.11799999999999999 0.026000000000000002">
+      <geom name="black_key_geom_52" class="black_key"/>
+      <joint name="black_joint_52" class="black_key"/>
+      <site name="black_key_site_52" class="black_key"/>
+    </body>
+    <body name="white_key_53" pos="0 0.12925000000000009 0.01125">
+      <geom name="white_key_geom_53" class="white_key"/>
+      <joint name="white_joint_53" class="white_key"/>
+      <site name="white_key_site_53" class="white_key"/>
+    </body>
+    <body name="black_key_54" pos="-0.029999999999999999 0.14150000000000007 0.026000000000000002">
+      <geom name="black_key_geom_54" class="black_key"/>
+      <joint name="black_joint_54" class="black_key"/>
+      <site name="black_key_site_54" class="black_key"/>
+    </body>
+    <body name="white_key_55" pos="0 0.15275000000000005 0.01125">
+      <geom name="white_key_geom_55" class="white_key"/>
+      <joint name="white_joint_55" class="white_key"/>
+      <site name="white_key_site_55" class="white_key"/>
+    </body>
+    <body name="white_key_56" pos="0 0.17625000000000002 0.01125">
+      <geom name="white_key_geom_56" class="white_key"/>
+      <joint name="white_joint_56" class="white_key"/>
+      <site name="white_key_site_56" class="white_key"/>
+    </body>
+    <body name="black_key_57" pos="-0.029999999999999999 0.1885 0.026000000000000002">
+      <geom name="black_key_geom_57" class="black_key"/>
+      <joint name="black_joint_57" class="black_key"/>
+      <site name="black_key_site_57" class="black_key"/>
+    </body>
+    <body name="white_key_58" pos="0 0.19975000000000009 0.01125">
+      <geom name="white_key_geom_58" class="white_key"/>
+      <joint name="white_joint_58" class="white_key"/>
+      <site name="white_key_site_58" class="white_key"/>
+    </body>
+    <body name="black_key_59" pos="-0.029999999999999999 0.21200000000000008 0.026000000000000002">
+      <geom name="black_key_geom_59" class="black_key"/>
+      <joint name="black_joint_59" class="black_key"/>
+      <site name="black_key_site_59" class="black_key"/>
+    </body>
+    <body name="white_key_60" pos="0 0.22325000000000006 0.01125">
+      <geom name="white_key_geom_60" class="white_key"/>
+      <joint name="white_joint_60" class="white_key"/>
+      <site name="white_key_site_60" class="white_key"/>
+    </body>
+    <body name="black_key_61" pos="-0.029999999999999999 0.23550000000000004 0.026000000000000002">
+      <geom name="black_key_geom_61" class="black_key"/>
+      <joint name="black_joint_61" class="black_key"/>
+      <site name="black_key_site_61" class="black_key"/>
+    </body>
+    <body name="white_key_62" pos="0 0.24675000000000002 0.01125">
+      <geom name="white_key_geom_62" class="white_key"/>
+      <joint name="white_joint_62" class="white_key"/>
+      <site name="white_key_site_62" class="white_key"/>
+    </body>
+    <body name="white_key_63" pos="0 0.2702500000000001 0.01125">
+      <geom name="white_key_geom_63" class="white_key"/>
+      <joint name="white_joint_63" class="white_key"/>
+      <site name="white_key_site_63" class="white_key"/>
+    </body>
+    <body name="black_key_64" pos="-0.029999999999999999 0.28250000000000008 0.026000000000000002">
+      <geom name="black_key_geom_64" class="black_key"/>
+      <joint name="black_joint_64" class="black_key"/>
+      <site name="black_key_site_64" class="black_key"/>
+    </body>
+    <body name="white_key_65" pos="0 0.29375000000000007 0.01125">
+      <geom name="white_key_geom_65" class="white_key"/>
+      <joint name="white_joint_65" class="white_key"/>
+      <site name="white_key_site_65" class="white_key"/>
+    </body>
+    <body name="black_key_66" pos="-0.029999999999999999 0.30600000000000016 0.026000000000000002">
+      <geom name="black_key_geom_66" class="black_key"/>
+      <joint name="black_joint_66" class="black_key"/>
+      <site name="black_key_site_66" class="black_key"/>
+    </body>
+    <body name="white_key_67" pos="0 0.31725000000000003 0.01125">
+      <geom name="white_key_geom_67" class="white_key"/>
+      <joint name="white_joint_67" class="white_key"/>
+      <site name="white_key_site_67" class="white_key"/>
+    </body>
+    <body name="white_key_68" pos="0 0.34075 0.01125">
+      <geom name="white_key_geom_68" class="white_key"/>
+      <joint name="white_joint_68" class="white_key"/>
+      <site name="white_key_site_68" class="white_key"/>
+    </body>
+    <body name="black_key_69" pos="-0.029999999999999999 0.35299999999999998 0.026000000000000002">
+      <geom name="black_key_geom_69" class="black_key"/>
+      <joint name="black_joint_69" class="black_key"/>
+      <site name="black_key_site_69" class="black_key"/>
+    </body>
+    <body name="white_key_70" pos="0 0.36425000000000007 0.01125">
+      <geom name="white_key_geom_70" class="white_key"/>
+      <joint name="white_joint_70" class="white_key"/>
+      <site name="white_key_site_70" class="white_key"/>
+    </body>
+    <body name="black_key_71" pos="-0.029999999999999999 0.37650000000000006 0.026000000000000002">
+      <geom name="black_key_geom_71" class="black_key"/>
+      <joint name="black_joint_71" class="black_key"/>
+      <site name="black_key_site_71" class="black_key"/>
+    </body>
+    <body name="white_key_72" pos="0 0.38775000000000004 0.01125">
+      <geom name="white_key_geom_72" class="white_key"/>
+      <joint name="white_joint_72" class="white_key"/>
+      <site name="white_key_site_72" class="white_key"/>
+    </body>
+    <body name="black_key_73" pos="-0.029999999999999999 0.40000000000000002 0.026000000000000002">
+      <geom name="black_key_geom_73" class="black_key"/>
+      <joint name="black_joint_73" class="black_key"/>
+      <site name="black_key_site_73" class="black_key"/>
+    </body>
+    <body name="white_key_74" pos="0 0.41125 0.01125">
+      <geom name="white_key_geom_74" class="white_key"/>
+      <joint name="white_joint_74" class="white_key"/>
+      <site name="white_key_site_74" class="white_key"/>
+    </body>
+    <body name="white_key_75" pos="0 0.43475000000000008 0.01125">
+      <geom name="white_key_geom_75" class="white_key"/>
+      <joint name="white_joint_75" class="white_key"/>
+      <site name="white_key_site_75" class="white_key"/>
+    </body>
+    <body name="black_key_76" pos="-0.029999999999999999 0.44700000000000006 0.026000000000000002">
+      <geom name="black_key_geom_76" class="black_key"/>
+      <joint name="black_joint_76" class="black_key"/>
+      <site name="black_key_site_76" class="black_key"/>
+    </body>
+    <body name="white_key_77" pos="0 0.45825000000000016 0.01125">
+      <geom name="white_key_geom_77" class="white_key"/>
+      <joint name="white_joint_77" class="white_key"/>
+      <site name="white_key_site_77" class="white_key"/>
+    </body>
+    <body name="black_key_78" pos="-0.029999999999999999 0.47050000000000014 0.026000000000000002">
+      <geom name="black_key_geom_78" class="black_key"/>
+      <joint name="black_joint_78" class="black_key"/>
+      <site name="black_key_site_78" class="black_key"/>
+    </body>
+    <body name="white_key_79" pos="0 0.48175000000000001 0.01125">
+      <geom name="white_key_geom_79" class="white_key"/>
+      <joint name="white_joint_79" class="white_key"/>
+      <site name="white_key_site_79" class="white_key"/>
+    </body>
+    <body name="white_key_80" pos="0 0.50525000000000009 0.01125">
+      <geom name="white_key_geom_80" class="white_key"/>
+      <joint name="white_joint_80" class="white_key"/>
+      <site name="white_key_site_80" class="white_key"/>
+    </body>
+    <body name="black_key_81" pos="-0.029999999999999999 0.51750000000000007 0.026000000000000002">
+      <geom name="black_key_geom_81" class="black_key"/>
+      <joint name="black_joint_81" class="black_key"/>
+      <site name="black_key_site_81" class="black_key"/>
+    </body>
+    <body name="white_key_82" pos="0 0.52875000000000016 0.01125">
+      <geom name="white_key_geom_82" class="white_key"/>
+      <joint name="white_joint_82" class="white_key"/>
+      <site name="white_key_site_82" class="white_key"/>
+    </body>
+    <body name="black_key_83" pos="-0.029999999999999999 0.54100000000000015 0.026000000000000002">
+      <geom name="black_key_geom_83" class="black_key"/>
+      <joint name="black_joint_83" class="black_key"/>
+      <site name="black_key_site_83" class="black_key"/>
+    </body>
+    <body name="white_key_84" pos="0 0.55225000000000002 0.01125">
+      <geom name="white_key_geom_84" class="white_key"/>
+      <joint name="white_joint_84" class="white_key"/>
+      <site name="white_key_site_84" class="white_key"/>
+    </body>
+    <body name="black_key_85" pos="-0.029999999999999999 0.56450000000000011 0.026000000000000002">
+      <geom name="black_key_geom_85" class="black_key"/>
+      <joint name="black_joint_85" class="black_key"/>
+      <site name="black_key_site_85" class="black_key"/>
+    </body>
+    <body name="white_key_86" pos="0 0.5757500000000001 0.01125">
+      <geom name="white_key_geom_86" class="white_key"/>
+      <joint name="white_joint_86" class="white_key"/>
+      <site name="white_key_site_86" class="white_key"/>
+    </body>
+    <body name="white_key_87" pos="0 0.59924999999999995 0.01125">
+      <geom name="white_key_geom_87" class="white_key"/>
+      <joint name="white_joint_87" class="white_key"/>
+      <site name="white_key_site_87" class="white_key"/>
+    </body>
+  </worldbody>
+</mujoco>
