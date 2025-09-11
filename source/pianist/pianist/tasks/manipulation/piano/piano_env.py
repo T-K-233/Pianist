@@ -181,7 +181,7 @@ class PianoEnvCfg(ManagerBasedRLEnvCfg):
         self.decimation = 2
         self.sim.render_interval = self.decimation
         self.episode_length_s = 12.0
-        self.viewer.eye = (-1.0, 1.0, 1.0)
-        self.viewer.lookat = (0.3, 0.0, 0.5)
+        self.viewer.eye = (-0.5, 1.0, 1.3)
+        self.viewer.lookat = (0.0, 0.0, 0.5)
         # simulation settings
         self.sim.dt = 1.0 / 60.0

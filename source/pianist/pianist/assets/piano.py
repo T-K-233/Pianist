@@ -9,7 +9,7 @@ PIANO_CFG = ArticulationCfg(
         activate_contact_sensors=False,
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.4, 0.0, 0.5),
+        pos=(0.0, 0.0, 0.5),
         rot=(0.0, 0.0, 0.0, 1.0),
         joint_pos={".*": 0.0},
     ),
