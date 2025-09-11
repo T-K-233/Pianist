@@ -41,7 +41,7 @@ SHADOW_HAND_CFG = ArticulationCfg(
                 "(FF|MF|RF|LF|TH)J(4|3|2)",
             ],
             effort_limit_sim={
-                "WRJ(X|Y)": 5,
+                "WRJ(X|Y)": 10,
                 "WRJ2": 4.785,
                 "WRJ1": 2.175,
                 "LFJ5": 0.9,
@@ -52,13 +52,13 @@ SHADOW_HAND_CFG = ArticulationCfg(
                 "THJ(3|2)": 0.99,
             },
             stiffness={
-                "WRJ(X|Y)": 5.0,
+                "WRJ(X|Y)": 30.0,
                 "WRJ(2|1)": 5.0,
                 "(LF|TH)J5": 1.0,
                 "(FF|MF|RF|LF|TH)J(4|3|2)": 1.0,
             },
             damping={
-                "WRJ(X|Y)": 0.5,
+                "WRJ(X|Y)": 10.0,
                 "WRJ(2|1)": 0.5,
                 "(LF|TH)J5": 0.1,
                 "(FF|MF|RF|LF|TH)J(4|3|2)": 0.1,

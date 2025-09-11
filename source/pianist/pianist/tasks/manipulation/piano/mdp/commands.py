@@ -1,118 +1,19 @@
 
-import math
-from dataclasses import MISSING
-
 from isaaclab.managers import CommandTermCfg
 from isaaclab.markers import VisualizationMarkersCfg
-from isaaclab.markers.config import BLUE_ARROW_X_MARKER_CFG, FRAME_MARKER_CFG, GREEN_ARROW_X_MARKER_CFG
+from isaaclab.markers.config import FRAME_MARKER_CFG
 from isaaclab.utils import configclass
 
 import torch
 from collections.abc import Sequence
 
 from isaaclab.assets import Articulation
+from isaaclab.envs import ManagerBasedRLEnv
 from isaaclab.managers import CommandTerm
 from isaaclab.markers import VisualizationMarkers
-from isaaclab.utils.math import combine_frame_transforms, compute_pose_error, quat_from_euler_xyz, quat_unique
 
-from isaaclab.envs import ManagerBasedEnv
+from pianist.assets.piano_constants import WHITE_KEY_INDICES, NUM_KEYS, WHITE_KEY_LENGTH
 
-
-WHITE_KEY_INDICES = [
-    0,
-    2,
-    3,
-    5,
-    7,
-    8,
-    10,
-    12,
-    14,
-    15,
-    17,
-    19,
-    20,
-    22,
-    24,
-    26,
-    27,
-    29,
-    31,
-    32,
-    34,
-    36,
-    38,
-    39,
-    41,
-    43,
-    44,
-    46,
-    48,
-    50,
-    51,
-    53,
-    55,
-    56,
-    58,
-    60,
-    62,
-    63,
-    65,
-    67,
-    68,
-    70,
-    72,
-    74,
-    75,
-    77,
-    79,
-    80,
-    82,
-    84,
-    86,
-    87,
-]
-
-BLACK_TWIN_KEY_INDICES = [
-    4,
-    6,
-    16,
-    18,
-    28,
-    30,
-    40,
-    42,
-    52,
-    54,
-    64,
-    66,
-    76,
-    78,
-]
-BLACK_TRIPLET_KEY_INDICES = [
-    1,
-    9,
-    11,
-    13,
-    21,
-    23,
-    25,
-    33,
-    35,
-    37,
-    45,
-    47,
-    49,
-    57,
-    59,
-    61,
-    69,
-    71,
-    73,
-    81,
-    83,
-    85,
-]
 
 class KeyPressCommand(CommandTerm):
     """Command generator for generating pose commands uniformly.
@@ -136,7 +37,7 @@ class KeyPressCommand(CommandTerm):
     cfg: "KeyPressCommandCfg"
     """Configuration for the command generator."""
 
-    def __init__(self, cfg: "KeyPressCommandCfg", env: ManagerBasedEnv):
+    def __init__(self, cfg: "KeyPressCommandCfg", env: ManagerBasedRLEnv):
         """Initialize the command generator class.
 
         Args:
@@ -146,28 +47,38 @@ class KeyPressCommand(CommandTerm):
         # initialize the base class
         super().__init__(cfg, env)
 
+        # TODO: move these to the cfg
+        robot_name = "robot"
+        piano_name = "piano"
+        robot_finger_body_names = ["ffdistal"]
+
         # extract the robot and body index for which the command is generated
-        self.robot: Articulation = env.scene[cfg.asset_name]
-        self.env = env
-        self.piano = env.scene["piano"]
-        self.body_idx = self.robot.find_bodies(["ffdistal"])[0][0]
+        self.robot: Articulation = env.scene[robot_name]
+        self.piano: Articulation = env.scene[piano_name]
+        self.finger_body_indices, _ = self.robot.find_bodies(robot_finger_body_names)
+        self.finger_body_indices = torch.tensor(self.finger_body_indices, device=self.device)
 
         query_key_names = []
-        for i in range(88):
+        for i in range(NUM_KEYS):
             if i in WHITE_KEY_INDICES:
                 query_key_names.append(f"white_key_{i}")
             else:
                 query_key_names.append(f"black_key_{i}")
-        self.key_body_index_mapping, _ = self.piano.find_bodies(query_key_names, preserve_order=True)
-        self.key_body_index_mapping = torch.tensor(self.key_body_index_mapping, device=self.device)
+        self.key_body_indices, _ = self.piano.find_bodies(query_key_names, preserve_order=True)
+        self.key_joint_indices, _ = self.piano.find_joints([name + "_joint" for name in query_key_names], preserve_order=True)
+        self.key_body_indices = torch.tensor(self.key_body_indices, device=self.device)
 
         # create buffers
-        # -- commands: (x, y, z, qw, qx, qy, qz) in root frame
-        self.pose_command_w = torch.zeros(self.num_envs, 7, device=self.device)
-        self.pose_command_w[:, 3] = 1.0
+        # discrete command to indicate if the key needs to be pressed
+        self._keypress_command = torch.zeros(self.num_envs, 88, device=self.device)
+        # target positions of the keys to be pressed, maximum 10 keys (one for each finger)
+        self._keypress_target_positions = torch.zeros(self.num_envs, 1, 3, device=self.device)
+
         # -- metrics
-        self.metrics["position_error"] = torch.zeros(self.num_envs, device=self.device)
-        self.metrics["orientation_error"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["finger_position_error"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["correct_pressed"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["correct_not_pressed"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["f1_error"] = torch.zeros(self.num_envs, device=self.device)
 
     def __str__(self) -> str:
         msg = "KeyPressCommand:\n"
@@ -185,7 +96,28 @@ class KeyPressCommand(CommandTerm):
 
         The first three elements correspond to the position, followed by the quaternion orientation in (w, x, y, z).
         """
-        return self.pose_command_w
+        return torch.cat(
+            [
+                self.keypress_command,
+                self.keypress_target_positions.flatten(start_dim=1),
+            ],
+            dim=1,
+        )
+
+    @property
+    def keypress_command(self) -> torch.Tensor:
+        return self._keypress_command
+
+    @property
+    def piano_pressed_status(self) -> torch.Tensor:
+        # print(self.piano.data.joint_pos[:, self.key_joint_indices].max())
+        # max depression is 0.0887 for black and 0.0666 for white
+        keypress_normalized = self.piano.data.joint_pos / self.piano.data.default_joint_pos_limits[:, :, 1]
+        return keypress_normalized[:, self.key_joint_indices]
+
+    @property
+    def keypress_target_positions(self) -> torch.Tensor:
+        return self._keypress_target_positions[:, :, 0:3]
 
     """
     Implementation specific functions.
@@ -193,38 +125,30 @@ class KeyPressCommand(CommandTerm):
 
     def _update_metrics(self):
         # compute the error
-        pos_error, rot_error = compute_pose_error(
-            self.pose_command_w[:, :3],
-            self.pose_command_w[:, 3:],
-            self.robot.data.body_pos_w[:, self.body_idx],
-            self.robot.data.body_quat_w[:, self.body_idx],
-        )
-        self.metrics["position_error"] = torch.norm(pos_error, dim=-1)
-        self.metrics["orientation_error"] = torch.norm(rot_error, dim=-1)
-        pass
+        fingertip_positions = self.piano.data.body_state_w[:, self.finger_body_indices, 0:3]
+        pos_error = torch.norm(self._keypress_target_positions[:, :, 0:3] - fingertip_positions, dim=-1).mean(dim=-1)
+        self.metrics["finger_position_error"] = pos_error
+
+        correct_pressed_percentage = ((self.keypress_command > 0.5) * (torch.abs(self.keypress_command - self.piano_pressed_status) < 0.2)).sum(dim=-1).float() / self.keypress_command.sum(dim=-1)
+        correct_not_pressed_percentage = ((self.keypress_command < 0.5) * (torch.abs(self.keypress_command - self.piano_pressed_status) < 0.2)).sum(dim=-1).float() / (NUM_KEYS - self.keypress_command.sum(dim=-1))
+        f1_score = (torch.abs(self.keypress_command - self.piano_pressed_status) < 0.2).sum(dim=-1).float() / NUM_KEYS
+        self.metrics["correct_pressed"] = correct_pressed_percentage
+        self.metrics["correct_not_pressed"] = correct_not_pressed_percentage
+        self.metrics["f1_error"] = f1_score
 
     def _resample_command(self, env_ids: Sequence[int]):
         # sample new pose targets
         # -- position
         random_note_index = torch.randint(20, 60, (len(env_ids),), device=self.device)
-        body_indices = self.key_body_index_mapping[random_note_index]
-        self.pose_command_w[env_ids, 0:3] = self.piano.data.body_state_w[env_ids, body_indices, 0:3]
-        # r = torch.empty(len(env_ids), device=self.device)
-        # self.pose_command_b[env_ids, 0] = r.uniform_(*self.cfg.ranges.pos_x)
-        # self.pose_command_b[env_ids, 1] = r.uniform_(*self.cfg.ranges.pos_y)
-        # self.pose_command_b[env_ids, 2] = r.uniform_(*self.cfg.ranges.pos_z)
-        # # -- orientation
-        # euler_angles = torch.zeros_like(self.pose_command_b[env_ids, :3])
-        # euler_angles[:, 0].uniform_(*self.cfg.ranges.roll)
-        # euler_angles[:, 1].uniform_(*self.cfg.ranges.pitch)
-        # euler_angles[:, 2].uniform_(*self.cfg.ranges.yaw)
-        # quat = quat_from_euler_xyz(euler_angles[:, 0], euler_angles[:, 1], euler_angles[:, 2])
-        # # make sure the quaternion has real part as positive
-        # self.pose_command_b[env_ids, 3:] = quat_unique(quat) if self.cfg.make_quat_unique else quat
+        self._keypress_command[env_ids, :] = 0
+        self._keypress_command[env_ids, random_note_index] = 1
+        body_indices = self.key_body_indices[random_note_index]
+        self._keypress_target_positions[env_ids, 0, 0:3] = self.piano.data.body_state_w[env_ids, body_indices, 0:3]
+
+        # specify the contact position to be at 70% of the white key length
+        self._keypress_target_positions[env_ids, 0, 0] -= 0.7 * WHITE_KEY_LENGTH
 
     def _update_command(self):
-        # middle_c_key_index, _ = self.piano.find_bodies(["white_key_39"])
-        # self.piano.data.body_state_w[:, middle_c_key_index]
         pass
 
     def _set_debug_vis_impl(self, debug_vis: bool):
@@ -250,10 +174,11 @@ class KeyPressCommand(CommandTerm):
             return
         # update the markers
         # -- goal pose
-        self.goal_pose_visualizer.visualize(self.pose_command_w[:, :3], self.pose_command_w[:, 3:])
+        piano_key_position = self.keypress_target_positions[:, 0, 0:3]
+        self.goal_pose_visualizer.visualize(piano_key_position)
         # -- current body pose
-        body_link_pose_w = self.robot.data.body_link_pose_w[:, self.body_idx]
-        self.current_pose_visualizer.visualize(body_link_pose_w[:, :3], body_link_pose_w[:, 3:7])
+        body_link_pose_w = self.robot.data.body_link_pose_w[:, self.finger_body_indices]
+        self.current_pose_visualizer.visualize(body_link_pose_w[:, 0, 0:3], body_link_pose_w[:, 0, 3:7])
 
 
 @configclass
@@ -262,15 +187,19 @@ class KeyPressCommandCfg(CommandTermCfg):
 
     class_type: type = KeyPressCommand
 
-    asset_name: str = MISSING
-    """Name of the asset in the environment for which the commands are generated."""
+    # robot_name: str = MISSING
+    # """Name of the robot in the environment for which the commands are generated."""
+
+    # piano_name: str = MISSING
+    # """Name of the piano in the environment for which the commands are generated."""
+
+    # robot_finger_body_names: list[str] = MISSING
+    # """Names of the robot finger bodies for which the commands are generated."""
 
     goal_pose_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/Command/goal_pose")
     """The configuration for the goal pose visualization marker. Defaults to FRAME_MARKER_CFG."""
 
-    current_pose_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(
-        prim_path="/Visuals/Command/body_pose"
-    )
+    current_pose_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/Command/body_pose")
     """The configuration for the current pose visualization marker. Defaults to FRAME_MARKER_CFG."""
 
     goal_pose_visualizer_cfg.markers["frame"].scale = (0.05, 0.05, 0.05)

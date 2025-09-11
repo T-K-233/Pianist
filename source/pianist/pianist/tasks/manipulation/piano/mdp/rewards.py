@@ -1,61 +1,147 @@
-from __future__ import annotations
-
 import torch
-from typing import TYPE_CHECKING
+from typing import Tuple
 
 from isaaclab.assets import RigidObject
 from isaaclab.managers import SceneEntityCfg
-from isaaclab.utils.math import combine_frame_transforms, quat_error_magnitude, quat_mul
+from isaaclab.envs import ManagerBasedRLEnv
 
-if TYPE_CHECKING:
-    from isaaclab.envs import ManagerBasedRLEnv
-
-
-def position_command_error(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg) -> torch.Tensor:
-    """Penalize tracking of the position error using L2-norm.
-
-    The function computes the position error between the desired position (from the command) and the
-    current position of the asset's body (in world frame). The position error is computed as the L2-norm
-    of the difference between the desired and current positions.
-    """
-    # extract the asset (to enable type hinting)
-    asset: RigidObject = env.scene[asset_cfg.name]
-    command = env.command_manager.get_command(command_name)
-    # obtain the desired and current positions
-    des_pos_w = command[:, :3]
-    curr_pos_w = asset.data.body_pos_w[:, asset_cfg.body_ids[0]]  # type: ignore
-    return torch.norm(curr_pos_w - des_pos_w, dim=1)
+from pianist.tasks.manipulation.piano.mdp.commands import KeyPressCommand
 
 
-def position_command_error_tanh(
-    env: ManagerBasedRLEnv, std: float, command_name: str, asset_cfg: SceneEntityCfg
+FINGER_CLOSE_ENOUGH_TO_KEY = 0.01
+KEY_CLOSE_ENOUGH_TO_PRESSED = 0.05
+
+
+def gaussian_sigmoid_func(
+    x: torch.Tensor,
+    value_at_margin: float
 ) -> torch.Tensor:
-    """Reward tracking of the position using the tanh kernel.
+    scale = torch.sqrt(-2 * torch.log(torch.tensor(value_at_margin)))
+    return torch.exp(-0.5 * torch.pow(x * scale, 2))
 
-    The function computes the position error between the desired position (from the command) and the
-    current position of the asset's body (in world frame) and maps it with a tanh kernel.
+
+def gaussian_tolerance(
+    x: torch.Tensor,
+    bounds: Tuple[float, float] = (0.0, 0.0),
+    margin: float = 0.0,
+    value_at_margin: float = 0.1,
+) -> torch.Tensor:
     """
+    Returns 1 when `x` falls inside the bounds, between 0 and 1 otherwise.
+
+    Args:
+        x: A torch tensor.
+        bounds: A tuple of floats specifying inclusive `(lower, upper)` bounds for
+        the target interval. These can be infinite if the interval is unbounded
+        at one or both ends, or they can be equal to one another if the target
+        value is exact.
+        margin: Float. Parameter that controls how steeply the output decreases as
+        `x` moves out-of-bounds.
+        * If `margin == 0` then the output will be 0 for all values of `x`
+            outside of `bounds`.
+        * If `margin > 0` then the output will decrease sigmoidally with
+            increasing distance from the nearest bound.
+        sigmoid: String, choice of sigmoid type. Valid values are: 'gaussian',
+        'linear', 'hyperbolic', 'long_tail', 'cosine', 'tanh_squared'.
+        value_at_margin: A float between 0 and 1 specifying the output value when
+        the distance from `x` to the nearest bound is equal to `margin`. Ignored
+        if `margin == 0`.
+
+    Returns:
+        A torch tensor with values between 0.0 and 1.0.
+
+    Raises:
+        ValueError: If `bounds[0] > bounds[1]`.
+        ValueError: If `margin` is negative.
+    """
+    lower, upper = bounds
+    if lower > upper:
+        raise ValueError('Lower bound must be <= upper bound.')
+    if margin < 0:
+        raise ValueError('`margin` must be non-negative.')
+
+    in_bounds = torch.logical_and(lower <= x, x <= upper)
+    if margin == 0:
+        value = torch.where(in_bounds, 1.0, 0.0)
+    else:
+        d = torch.where(x < lower, lower - x, x - upper) / margin
+        value = torch.where(in_bounds, 1.0, gaussian_sigmoid_func(d, value_at_margin))
+
+    return value
+
+
+def keypress_reward(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:
+    """Reward for pressing the right keys at the right time."""
+
+    # piano: Articulation = env.scene[piano_entity_cfg.name]
+    command_term: KeyPressCommand = env.command_manager.get_term(command_name)
+    keypress_command = command_term.keypress_command
+    piano_key_press_state = command_term.piano_pressed_status
+
+    # on = np.flatnonzero(self._goal_current[:-1])
+    # rew = 0.0
+    # # It's possible we have no keys to press at this timestep, so we need to check
+    # # that `on` is not empty.
+    # if on.size > 0:
+    #     actual = np.array(self.piano.state / self.piano._qpos_range[:, 1])
+    #     rews = tolerance(
+    #         self._goal_current[:-1][on] - actual[on],
+    #         bounds=(0, _KEY_CLOSE_ENOUGH_TO_PRESSED),
+    #         margin=(_KEY_CLOSE_ENOUGH_TO_PRESSED * 10),
+    #         sigmoid="gaussian",
+    #     )
+    #     rew += 0.5 * rews.mean()
+    # # If there are any false positives, the remaining 0.5 reward is lost.
+    # off = np.flatnonzero(1 - self._goal_current[:-1])
+    # rew += 0.5 * (1 - float(self.piano.activation[off].any()))
+    # return rew
+
+    # get the key indices of nonzero elements in the command
+    on_keys = torch.nonzero(keypress_command, as_tuple=True)
+    off_keys = torch.nonzero(1 - keypress_command, as_tuple=True)
+    rewards = torch.zeros(env.num_envs, device=env.device)
+
+    # if we have pressed the correct keys, reward according to the correct amount
+    # rewards += 0.5 * torch.abs(keypress_command[on_keys] - piano_key_press_state[on_keys]).mean(dim=-1)
+    key_rewards = gaussian_tolerance(
+        keypress_command[on_keys] - piano_key_press_state[on_keys],
+        bounds=(0.0, KEY_CLOSE_ENOUGH_TO_PRESSED),
+        margin=KEY_CLOSE_ENOUGH_TO_PRESSED * 10,
+    )
+    rewards += 0.5 * key_rewards.mean(dim=-1)
+
+    # if there are any false positives, the other half of the reward is lost.
+    rewards += 0.5 * torch.abs(1 - piano_key_press_state[off_keys].any(dim=-1).int())
+
+    return rewards
+
+
+def fingertip_to_key_distance(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg) -> torch.Tensor:
     # extract the asset (to enable type hinting)
     asset: RigidObject = env.scene[asset_cfg.name]
-    command = env.command_manager.get_command(command_name)
+    command_term: KeyPressCommand = env.command_manager.get_term(command_name)
+
     # obtain the desired and current positions
-    des_pos_w = command[:, :3]
-    curr_pos_w = asset.data.body_pos_w[:, asset_cfg.body_ids[0]]  # type: ignore
-    distance = torch.norm(curr_pos_w - des_pos_w, dim=1)
-    return 1 - torch.tanh(distance / std)
+    key_positions = command_term.keypress_target_positions[:, :, 0:3]
+    fingertip_positions = asset.data.body_pos_w[:, command_term.finger_body_indices]  # type: ignore
+
+    distances = torch.norm(fingertip_positions - key_positions, dim=-1)
+    return distances
 
 
-def orientation_command_error(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg) -> torch.Tensor:
-    """Penalize tracking orientation error using shortest path.
+def fingertip_to_key_distance_l2(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+    distances = fingertip_to_key_distance(env, command_name, asset_cfg)
+    return torch.mean(distances, dim=-1)
 
-    The function computes the orientation error between the desired orientation (from the command) and the
-    current orientation of the asset's body (in world frame). The orientation error is computed as the shortest
-    path between the desired and current orientations.
-    """
-    # extract the asset (to enable type hinting)
-    asset: RigidObject = env.scene[asset_cfg.name]
-    command = env.command_manager.get_command(command_name)
-    # obtain the desired and current orientations
-    des_quat_w = command[:, 3:7]
-    curr_quat_w = asset.data.body_quat_w[:, asset_cfg.body_ids[0]]  # type: ignore
-    return quat_error_magnitude(curr_quat_w, des_quat_w)
+
+def fingertip_to_key_distance_reward(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+    distances = fingertip_to_key_distance(env, command_name, asset_cfg)
+
+    distance_rewards = gaussian_tolerance(
+        distances.flatten(start_dim=1),
+        bounds=(0, FINGER_CLOSE_ENOUGH_TO_KEY),
+        margin=(FINGER_CLOSE_ENOUGH_TO_KEY * 10),
+    )
+    rewards = distance_rewards.mean(dim=-1)
+
+    return rewards

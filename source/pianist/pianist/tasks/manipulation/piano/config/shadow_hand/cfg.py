@@ -19,11 +19,3 @@ class ShadowHandCfg(PianoEnvCfg):
                 joint_pos={".*": 0.0},
             )
         )
-
-        # override rewards
-        self.rewards.end_effector_position_tracking.params["asset_cfg"].body_names = ["ffdistal"]
-        self.rewards.end_effector_position_tracking_fine_grained.params["asset_cfg"].body_names = ["ffdistal"]
-        # self.rewards.end_effector_orientation_tracking.params["asset_cfg"].body_names = ["ffdistal"]
-
-        # override command generator body
-        # end-effector is along z-direction

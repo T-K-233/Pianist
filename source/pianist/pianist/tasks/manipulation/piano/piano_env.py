@@ -1,8 +1,6 @@
 from dataclasses import MISSING
 
 import isaaclab.sim as sim_utils
-from isaaclab.actuators.actuator_cfg import ImplicitActuatorCfg
-from isaaclab.assets import ArticulationCfg
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import EventTermCfg as EventTerm
@@ -32,6 +30,21 @@ class PianoSceneCfg(InteractiveSceneCfg):
 
     piano = PIANO_CFG.replace(prim_path="{ENV_REGEX_NS}/piano")
 
+    # a ball just for debugging
+    # ball = AssetBaseCfg(
+    #     prim_path="/World/ball",
+    #     spawn=sim_utils.SphereCfg(
+    #         radius=0.03,
+    #         rigid_props=sim_utils.RigidBodyPropertiesCfg(
+    #             solver_position_iteration_count=4,
+    #             solver_velocity_iteration_count=0,
+    #         ),
+    #         mass_props=sim_utils.MassPropertiesCfg(mass=10.0),
+    #         collision_props=sim_utils.CollisionPropertiesCfg(),
+    #     ),
+    #     init_state=AssetBaseCfg.InitialStateCfg(pos=(0.4, 0.5, 1.0)),
+    # )
+
     # robots
     robot: ArticulationCfg = MISSING
 
@@ -50,11 +63,12 @@ class PianoSceneCfg(InteractiveSceneCfg):
 class CommandsCfg:
     """Command terms for the MDP."""
 
-    ee_pose = mdp.KeyPressCommandCfg(
-        asset_name="robot",
+    keypress = mdp.KeyPressCommandCfg(
+        # asset_name="robot",
         resampling_time_range=(1.0, 4.0),
         debug_vis=True,
     )
+
 
 @configclass
 class ObservationsCfg:
@@ -67,7 +81,7 @@ class ObservationsCfg:
         # observation terms (order preserved)
         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
         joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
-        pose_command = ObsTerm(func=mdp.generated_commands, params={"command_name": "ee_pose"})
+        pose_command = ObsTerm(func=mdp.generated_commands, params={"command_name": "keypress"})
         actions = ObsTerm(func=mdp.last_action)
 
         def __post_init__(self):
@@ -96,28 +110,19 @@ class RewardsCfg:
     """Reward terms for the MDP."""
 
     # task terms
-    end_effector_position_tracking = RewTerm(
-        func=mdp.position_command_error,
-        weight=-0.2,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names=["ffdistal"]), "command_name": "ee_pose"},
+    keypress = RewTerm(
+        func=mdp.keypress_reward,
+        params={"command_name": "keypress"},
+        weight=1.0,
     )
-    end_effector_position_tracking_fine_grained = RewTerm(
-        func=mdp.position_command_error_tanh,
-        weight=0.1,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names=["ffdistal"]), "std": 0.1, "command_name": "ee_pose"},
+    fingertip_to_key_distance = RewTerm(
+        func=mdp.fingertip_to_key_distance_reward,
+        params={"asset_cfg": SceneEntityCfg("robot"), "command_name": "keypress"},
+        weight=1.0,
     )
-    # end_effector_orientation_tracking = RewTerm(
-    #     func=mdp.orientation_command_error,
-    #     weight=-0.1,
-    #     params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "command_name": "ee_pose"},
-    # )
-
-    # action penalty
-    action_rate = RewTerm(func=mdp.action_rate_l2, weight=-0.0001)
-    joint_vel = RewTerm(
-        func=mdp.joint_vel_l2,
-        weight=-0.0001,
-        params={"asset_cfg": SceneEntityCfg("robot")},
+    action_rate = RewTerm(
+        func=mdp.action_rate_l2,
+        weight=-1e-4,
     )
 
 
@@ -176,6 +181,7 @@ class PianoEnvCfg(ManagerBasedRLEnvCfg):
         self.decimation = 2
         self.sim.render_interval = self.decimation
         self.episode_length_s = 12.0
-        self.viewer.eye = (3.5, 3.5, 3.5)
+        self.viewer.eye = (-1.0, 1.0, 1.0)
+        self.viewer.lookat = (0.3, 0.0, 0.5)
         # simulation settings
         self.sim.dt = 1.0 / 60.0

@@ -16,7 +16,7 @@ PIANO_CFG = ArticulationCfg(
     actuators={
         ".*": ImplicitActuatorCfg(
             joint_names_expr=[".*"],
-            effort_limit_sim={".*": 0.0},
+            effort_limit_sim={".*": 2.0},
             stiffness={".*": 2.0},
             damping={".*": 0.05},
             armature={".*": 0.001},
