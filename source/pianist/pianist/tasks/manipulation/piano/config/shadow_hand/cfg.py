@@ -14,7 +14,7 @@ class ShadowHandCfg(PianoEnvCfg):
 
         self.scene.robot = SHADOW_HAND_CFG.replace(prim_path="/World/envs/env_.*/robot").replace(
             init_state=ArticulationCfg.InitialStateCfg(
-                pos=(-0.4, 0.0, 0.6),
+                pos=(-0.4, 0.0, 0.55),
                 rot=(1.0, 0.0, 0.0, 0.0),
                 joint_pos={".*": 0.0},
             )

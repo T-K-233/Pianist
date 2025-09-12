@@ -1,12 +1,13 @@
 
 from isaaclab.managers import CommandTermCfg
 from isaaclab.markers import VisualizationMarkersCfg
-from isaaclab.markers.config import FRAME_MARKER_CFG
+from isaaclab.markers.config import CUBOID_MARKER_CFG, SPHERE_MARKER_CFG
 from isaaclab.utils import configclass
 
 import torch
 from collections.abc import Sequence
 
+import isaaclab.sim as sim_utils
 from isaaclab.assets import Articulation
 from isaaclab.envs import ManagerBasedRLEnv
 from isaaclab.managers import CommandTerm
@@ -153,18 +154,18 @@ class KeyPressCommand(CommandTerm):
     def _set_debug_vis_impl(self, debug_vis: bool):
         # create markers if necessary for the first time
         if debug_vis:
-            if not hasattr(self, "goal_pose_visualizer"):
+            if not hasattr(self, "goal_key_visualizer"):
                 # -- goal pose
-                self.goal_pose_visualizer = VisualizationMarkers(self.cfg.goal_pose_visualizer_cfg)
+                self.goal_key_visualizer = VisualizationMarkers(self.cfg.goal_key_visualizer_cfg)
                 # -- current body pose
-                self.current_pose_visualizer = VisualizationMarkers(self.cfg.current_pose_visualizer_cfg)
+                self.current_key_visualizer = VisualizationMarkers(self.cfg.current_key_visualizer_cfg)
             # set their visibility to true
-            self.goal_pose_visualizer.set_visibility(True)
-            self.current_pose_visualizer.set_visibility(True)
+            self.goal_key_visualizer.set_visibility(True)
+            self.current_key_visualizer.set_visibility(True)
         else:
-            if hasattr(self, "goal_pose_visualizer"):
-                self.goal_pose_visualizer.set_visibility(False)
-                self.current_pose_visualizer.set_visibility(False)
+            if hasattr(self, "goal_key_visualizer"):
+                self.goal_key_visualizer.set_visibility(False)
+                self.current_key_visualizer.set_visibility(False)
 
     def _debug_vis_callback(self, event):
         # check if robot is initialized
@@ -174,11 +175,11 @@ class KeyPressCommand(CommandTerm):
         # update the markers
         # -- goal pose
         loc = self.target_key_locations[:, 0, 0:3]
-        self.goal_pose_visualizer.visualize(loc)
+        self.goal_key_visualizer.visualize(loc)
         # -- current body pose
         finger_quat = self.robot.data.body_quat_w[:, self._finger_body_indices][:, 0]
         pos = self.fingertip_positions[:, 0]
-        self.current_pose_visualizer.visualize(pos, finger_quat)
+        self.current_key_visualizer.visualize(pos, finger_quat)
 
 
 @configclass
@@ -199,11 +200,24 @@ class KeyPressCommandCfg(CommandTermCfg):
     key_close_enough_to_pressed: float = 0.05
     """The threshold for the key to be considered pressed."""
 
-    goal_pose_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/Command/goal_pose")
-    """The configuration for the goal pose visualization marker. Defaults to FRAME_MARKER_CFG."""
+    goal_key_visualizer_cfg = VisualizationMarkersCfg(
+        prim_path="/Visuals/Command/goal_pos",
+        markers={
+            "cuboid": sim_utils.CuboidCfg(
+                size=(0.05, 0.02, 0.025),
+                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0)),
+            ),
+        },
+    )
+    """The configuration for the goal pose visualization marker."""
 
-    current_pose_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/Command/body_pose")
-    """The configuration for the current pose visualization marker. Defaults to FRAME_MARKER_CFG."""
-
-    goal_pose_visualizer_cfg.markers["frame"].scale = (0.05, 0.05, 0.05)
-    current_pose_visualizer_cfg.markers["frame"].scale = (0.05, 0.05, 0.05)
+    current_key_visualizer_cfg = VisualizationMarkersCfg(
+        prim_path="/Visuals/Command/body_pos",
+        markers={
+            "sphere": sim_utils.SphereCfg(
+                radius=0.01,
+                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0)),
+            ),
+        },
+    )
+    """The configuration for the current pose visualization marker."""

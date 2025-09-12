@@ -24,5 +24,5 @@ uv run ./scripts/zero_agent.py --task Piano-Shadow-v0 --num_envs 4
 ## Train
 
 ```bash
-uv run ./scripts/rsl_rl/train.py --task Piano-Shadow-v0 --headless --logger wandb --log_project_name Pianist --run_name more_paper_rew 
+uv run ./scripts/rsl_rl/train.py --task Piano-Shadow-v0 --headless --logger wandb --log_project_name Pianist --run_name more_paper_rew
 ```

@@ -3,7 +3,14 @@ from isaaclab.utils import configclass
 from isaaclab.assets.articulation.articulation import Articulation
 from isaaclab.assets.articulation.articulation_cfg import ArticulationCfg
 
-from pianist.assets.piano_constants import WHITE_KEY_INDICES, NUM_KEYS, WHITE_KEY_LENGTH
+from pianist.assets.piano_constants import (
+    WHITE_KEY_INDICES,
+    BLACK_KEY_INDICES,
+    NUM_KEYS,
+    WHITE_KEY_LENGTH,
+    BLACK_KEY_LENGTH,
+    BLACK_KEY_HEIGHT,
+)
 
 
 class PianoArticulation(Articulation):
@@ -24,6 +31,13 @@ class PianoArticulation(Articulation):
         self._key_body_indices = torch.tensor(key_body_indices, device=self.device)
         self._key_joint_indices = torch.tensor(key_joint_indices, device=self.device)
 
+        self._key_contact_offsets = torch.zeros(self.num_joints, 3, device=self.device)
+
+        # specify the contact position to be at 80% of the key length
+        self._key_contact_offsets[WHITE_KEY_INDICES, 0] += -0.8 * WHITE_KEY_LENGTH
+        self._key_contact_offsets[BLACK_KEY_INDICES, 0] += -0.8 * BLACK_KEY_LENGTH
+        self._key_contact_offsets[BLACK_KEY_INDICES, 2] += BLACK_KEY_HEIGHT
+
         # gives an upward force when the key is at rest
         spring_ref_position = torch.zeros(1, self.num_joints, device=self.device)
         spring_ref_position[:] = -0.017453292519943295
@@ -34,11 +48,11 @@ class PianoArticulation(Articulation):
         key_press_normalized = self.data.joint_pos / self.data.default_joint_pos_limits[:, :, 1]
         return key_press_normalized[:, self._key_joint_indices]
 
-    def get_key_world_locations(self, env_ids: torch.Tensor, key_index: torch.Tensor) -> torch.Tensor:
-        key_locations = self.data.body_pos_w[env_ids, self._key_body_indices[key_index]]
+    def get_key_world_locations(self, env_ids: torch.Tensor, key_indices: torch.Tensor) -> torch.Tensor:
+        key_locations = self.data.body_pos_w[env_ids, self._key_body_indices[key_indices]]
 
-        # specify the contact position to be at 70% of the white key length
-        key_locations[:, 0] -= 0.7 * WHITE_KEY_LENGTH
+        # add the offset from the key rotate joints as the desired contact location
+        key_locations += self._key_contact_offsets[key_indices]
         return key_locations
 
 
