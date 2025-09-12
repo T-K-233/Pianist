@@ -14,7 +14,7 @@ from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
 import pianist.tasks.manipulation.piano.mdp as mdp
-from pianist.assets.piano import PIANO_CFG
+from pianist.assets.piano_cfg import PIANO_CFG
 
 
 @configclass
@@ -79,14 +79,15 @@ class ObservationsCfg:
         """Observations for policy group."""
 
         # observation terms (order preserved)
+        keypress_command = ObsTerm(func=mdp.generated_commands, params={"command_name": "keypress"})
         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
-        pose_command = ObsTerm(func=mdp.generated_commands, params={"command_name": "keypress"})
+        # joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
+        forearm_pos = ObsTerm(func=mdp.forearm_pos, params={"robot_asset_cfg": SceneEntityCfg("robot")})
+        piano_key_positions = ObsTerm(func=mdp.piano_key_pos, params={"piano_asset_cfg": SceneEntityCfg("piano")})
         actions = ObsTerm(func=mdp.last_action)
 
         def __post_init__(self):
             self.enable_corruption = True
-            self.concatenate_terms = True
 
     # observation groups
     policy: PolicyCfg = PolicyCfg()
@@ -99,7 +100,7 @@ class ActionsCfg:
     joint_pos = mdp.JointPositionActionCfg(
         asset_name="robot",
         joint_names=[".*"],
-        scale=0.5,
+        scale=1.0,
         preserve_order=True,
         use_default_offset=True,
     )
@@ -110,20 +111,25 @@ class RewardsCfg:
     """Reward terms for the MDP."""
 
     # task terms
-    keypress = RewTerm(
-        func=mdp.keypress_reward,
+    key_press = RewTerm(
+        func=mdp.key_press_reward,
         params={"command_name": "keypress"},
         weight=1.0,
     )
-    fingertip_to_key_distance = RewTerm(
+    energy = RewTerm(
+        func=mdp.energy_reward,
+        params={"robot_asset_cfg": SceneEntityCfg("robot")},
+        weight=-5e-3,
+    )
+    minimize_fingertip_to_key_distance = RewTerm(
         func=mdp.fingertip_to_key_distance_reward,
         params={"asset_cfg": SceneEntityCfg("robot"), "command_name": "keypress"},
         weight=1.0,
     )
-    action_rate = RewTerm(
-        func=mdp.action_rate_l2,
-        weight=-1e-4,
-    )
+    # sustain_pedal = RewTerm(
+    #     func=mdp.sustain_pedal_reward,
+    #     weight=-1e-4,
+    # )
 
 
 @configclass

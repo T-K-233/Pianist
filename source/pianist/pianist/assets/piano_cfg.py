@@ -1,9 +1,10 @@
 import isaaclab.sim as sim_utils
 from isaaclab.actuators.actuator_cfg import ImplicitActuatorCfg
-from isaaclab.assets.articulation import ArticulationCfg
+from isaaclab.assets.articulation.articulation_cfg import ArticulationCfg
+from pianist.assets.piano_articulation import PianoArticulationCfg
 
 
-PIANO_CFG = ArticulationCfg(
+PIANO_CFG = PianoArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
         usd_path="source/pianist/data/assets/piano/usd/piano.usd",
         activate_contact_sensors=False,

@@ -12,7 +12,8 @@ from isaaclab.envs import ManagerBasedRLEnv
 from isaaclab.managers import CommandTerm
 from isaaclab.markers import VisualizationMarkers
 
-from pianist.assets.piano_constants import WHITE_KEY_INDICES, NUM_KEYS, WHITE_KEY_LENGTH
+from pianist.assets.piano_articulation import PianoArticulation
+from pianist.assets.piano_constants import NUM_KEYS
 
 
 class KeyPressCommand(CommandTerm):
@@ -54,31 +55,23 @@ class KeyPressCommand(CommandTerm):
 
         # extract the robot and body index for which the command is generated
         self.robot: Articulation = env.scene[robot_name]
-        self.piano: Articulation = env.scene[piano_name]
-        self.finger_body_indices, _ = self.robot.find_bodies(robot_finger_body_names)
-        self.finger_body_indices = torch.tensor(self.finger_body_indices, device=self.device)
+        self.piano: PianoArticulation = env.scene[piano_name]
+        self.piano.manual_init()
 
-        query_key_names = []
-        for i in range(NUM_KEYS):
-            if i in WHITE_KEY_INDICES:
-                query_key_names.append(f"white_key_{i}")
-            else:
-                query_key_names.append(f"black_key_{i}")
-        self.key_body_indices, _ = self.piano.find_bodies(query_key_names, preserve_order=True)
-        self.key_joint_indices, _ = self.piano.find_joints([name + "_joint" for name in query_key_names], preserve_order=True)
-        self.key_body_indices = torch.tensor(self.key_body_indices, device=self.device)
+        finger_body_indices, _ = self.robot.find_bodies(robot_finger_body_names)
+        self._finger_body_indices = torch.tensor(finger_body_indices, device=self.device)
 
         # create buffers
         # discrete command to indicate if the key needs to be pressed
-        self._keypress_command = torch.zeros(self.num_envs, 88, device=self.device)
-        # target positions of the keys to be pressed, maximum 10 keys (one for each finger)
-        self._keypress_target_positions = torch.zeros(self.num_envs, 1, 3, device=self.device)
+        self._key_press_goals = torch.zeros(self.num_envs, 88, device=self.device)
+        # target locations of the keys to be pressed, maximum 10 keys (one for each finger)
+        self._target_key_locations = torch.zeros(self.num_envs, 1, 3, device=self.device)
 
         # -- metrics
-        self.metrics["finger_position_error"] = torch.zeros(self.num_envs, device=self.device)
-        self.metrics["correct_pressed"] = torch.zeros(self.num_envs, device=self.device)
-        self.metrics["correct_not_pressed"] = torch.zeros(self.num_envs, device=self.device)
-        self.metrics["f1_error"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["fingertip_to_key_distance"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["correctly_pressed"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["correctly_not_pressed"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["f1"] = torch.zeros(self.num_envs, device=self.device)
 
     def __str__(self) -> str:
         msg = "KeyPressCommand:\n"
@@ -96,28 +89,30 @@ class KeyPressCommand(CommandTerm):
 
         The first three elements correspond to the position, followed by the quaternion orientation in (w, x, y, z).
         """
+        # return self.keypress_command
         return torch.cat(
             [
-                self.keypress_command,
-                self.keypress_target_positions.flatten(start_dim=1),
+                self.key_press_goals,
+                self.target_key_locations.flatten(start_dim=1),
             ],
             dim=1,
         )
 
     @property
-    def keypress_command(self) -> torch.Tensor:
-        return self._keypress_command
+    def key_press_goals(self) -> torch.Tensor:
+        return self._key_press_goals
 
     @property
-    def piano_pressed_status(self) -> torch.Tensor:
-        # print(self.piano.data.joint_pos[:, self.key_joint_indices].max())
-        # max depression is 0.0887 for black and 0.0666 for white
-        keypress_normalized = self.piano.data.joint_pos / self.piano.data.default_joint_pos_limits[:, :, 1]
-        return keypress_normalized[:, self.key_joint_indices]
+    def key_press_actual(self) -> torch.Tensor:
+        return self.piano.key_press_states
 
     @property
-    def keypress_target_positions(self) -> torch.Tensor:
-        return self._keypress_target_positions[:, :, 0:3]
+    def target_key_locations(self) -> torch.Tensor:
+        return self._target_key_locations
+
+    @property
+    def fingertip_positions(self) -> torch.Tensor:
+        return self.robot.data.body_pos_w[:, self._finger_body_indices]
 
     """
     Implementation specific functions.
@@ -125,28 +120,26 @@ class KeyPressCommand(CommandTerm):
 
     def _update_metrics(self):
         # compute the error
-        fingertip_positions = self.piano.data.body_state_w[:, self.finger_body_indices, 0:3]
-        pos_error = torch.norm(self._keypress_target_positions[:, :, 0:3] - fingertip_positions, dim=-1).mean(dim=-1)
-        self.metrics["finger_position_error"] = pos_error
+        pos_error = torch.norm(self._target_key_locations - self.fingertip_positions, dim=-1).mean(dim=-1)
 
-        correct_pressed_percentage = ((self.keypress_command > 0.5) * (torch.abs(self.keypress_command - self.piano_pressed_status) < 0.2)).sum(dim=-1).float() / self.keypress_command.sum(dim=-1)
-        correct_not_pressed_percentage = ((self.keypress_command < 0.5) * (torch.abs(self.keypress_command - self.piano_pressed_status) < 0.2)).sum(dim=-1).float() / (NUM_KEYS - self.keypress_command.sum(dim=-1))
-        f1_score = (torch.abs(self.keypress_command - self.piano_pressed_status) < 0.2).sum(dim=-1).float() / NUM_KEYS
-        self.metrics["correct_pressed"] = correct_pressed_percentage
-        self.metrics["correct_not_pressed"] = correct_not_pressed_percentage
-        self.metrics["f1_error"] = f1_score
+        correctly_pressed_percentage = ((self.key_press_goals > 0.5) * (torch.abs(self.key_press_goals - self.key_press_actual) < 0.2)).sum(dim=-1).float() / self.key_press_goals.sum(dim=-1)
+        correctly_not_pressed_percentage = ((self.key_press_goals < 0.5) * (torch.abs(self.key_press_goals - self.key_press_actual) < 0.2)).sum(dim=-1).float() / (NUM_KEYS - self.key_press_goals.sum(dim=-1))
+
+        f1_score = (torch.abs(self.key_press_goals - self.key_press_actual) < 0.2).sum(dim=-1).float() / NUM_KEYS
+
+        self.metrics["fingertip_to_key_distance"] = pos_error
+        self.metrics["correctly_pressed"] = correctly_pressed_percentage
+        self.metrics["correctly_not_pressed"] = correctly_not_pressed_percentage
+        self.metrics["f1"] = f1_score
 
     def _resample_command(self, env_ids: Sequence[int]):
         # sample new pose targets
         # -- position
         random_note_index = torch.randint(20, 60, (len(env_ids),), device=self.device)
-        self._keypress_command[env_ids, :] = 0
-        self._keypress_command[env_ids, random_note_index] = 1
-        body_indices = self.key_body_indices[random_note_index]
-        self._keypress_target_positions[env_ids, 0, 0:3] = self.piano.data.body_state_w[env_ids, body_indices, 0:3]
-
-        # specify the contact position to be at 70% of the white key length
-        self._keypress_target_positions[env_ids, 0, 0] -= 0.7 * WHITE_KEY_LENGTH
+        self._key_press_goals[env_ids, :] = 0
+        self._key_press_goals[env_ids, random_note_index] = 1
+        target_locations = self.piano.get_key_world_locations(env_ids, random_note_index)
+        self._target_key_locations[env_ids, 0, 0:3] = target_locations
 
     def _update_command(self):
         pass
@@ -174,11 +167,12 @@ class KeyPressCommand(CommandTerm):
             return
         # update the markers
         # -- goal pose
-        piano_key_position = self.keypress_target_positions[:, 0, 0:3]
-        self.goal_pose_visualizer.visualize(piano_key_position)
+        loc = self.target_key_locations[:, 0, 0:3]
+        self.goal_pose_visualizer.visualize(loc)
         # -- current body pose
-        body_link_pose_w = self.robot.data.body_link_pose_w[:, self.finger_body_indices]
-        self.current_pose_visualizer.visualize(body_link_pose_w[:, 0, 0:3], body_link_pose_w[:, 0, 3:7])
+        finger_quat = self.robot.data.body_quat_w[:, self._finger_body_indices][:, 0]
+        pos = self.fingertip_positions[:, 0]
+        self.current_pose_visualizer.visualize(pos, finger_quat)
 
 
 @configclass
