@@ -17,6 +17,10 @@ import pianist.tasks.manipulation.piano.mdp as mdp
 from pianist.assets.piano_cfg import PIANO_CFG
 
 
+FINGER_CLOSE_ENOUGH_TO_KEY = 0.01
+KEY_CLOSE_ENOUGH_TO_PRESSED = 0.05
+
+
 @configclass
 class PianoSceneCfg(InteractiveSceneCfg):
     """Configuration for the scene with a piano."""
@@ -66,6 +70,7 @@ class CommandsCfg:
     keypress = mdp.KeyPressCommandCfg(
         # asset_name="robot",
         resampling_time_range=(1.0, 4.0),
+        key_close_enough_to_pressed=KEY_CLOSE_ENOUGH_TO_PRESSED,
         debug_vis=True,
     )
 
@@ -79,10 +84,10 @@ class ObservationsCfg:
         """Observations for policy group."""
 
         # observation terms (order preserved)
-        keypress_command = ObsTerm(func=mdp.generated_commands, params={"command_name": "keypress"})
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
-        # joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
+        piano_key_goal_state = ObsTerm(func=mdp.generated_commands, params={"command_name": "keypress"})
         forearm_pos = ObsTerm(func=mdp.forearm_pos, params={"robot_asset_cfg": SceneEntityCfg("robot")})
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
+        active_fingers = ObsTerm(func=mdp.active_fingers, params={"command_name": "keypress"})
         piano_key_positions = ObsTerm(func=mdp.piano_key_pos, params={"piano_asset_cfg": SceneEntityCfg("piano")})
         actions = ObsTerm(func=mdp.last_action)
 
@@ -113,7 +118,10 @@ class RewardsCfg:
     # task terms
     key_press = RewTerm(
         func=mdp.key_press_reward,
-        params={"command_name": "keypress"},
+        params={
+            "command_name": "keypress",
+            "key_close_enough_to_pressed": KEY_CLOSE_ENOUGH_TO_PRESSED,
+        },
         weight=1.0,
     )
     energy = RewTerm(
@@ -123,7 +131,11 @@ class RewardsCfg:
     )
     minimize_fingertip_to_key_distance = RewTerm(
         func=mdp.fingertip_to_key_distance_reward,
-        params={"asset_cfg": SceneEntityCfg("robot"), "command_name": "keypress"},
+        params={
+            "command_name": "keypress",
+            "asset_cfg": SceneEntityCfg("robot"),
+            "finger_close_enough_to_key": FINGER_CLOSE_ENOUGH_TO_KEY,
+        },
         weight=1.0,
     )
     # sustain_pedal = RewTerm(

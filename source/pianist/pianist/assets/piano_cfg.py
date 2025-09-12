@@ -8,6 +8,19 @@ PIANO_CFG = PianoArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
         usd_path="source/pianist/data/assets/piano/usd/piano.usd",
         activate_contact_sensors=False,
+        rigid_props=sim_utils.RigidBodyPropertiesCfg(
+            disable_gravity=True,
+            retain_accelerations=True,
+            max_depenetration_velocity=1000.0,
+        ),
+        articulation_props=sim_utils.ArticulationRootPropertiesCfg(
+            enabled_self_collisions=False,
+            solver_position_iteration_count=8,
+            solver_velocity_iteration_count=0,
+            sleep_threshold=0.005,
+            stabilization_threshold=0.0005,
+        ),
+        joint_drive_props=sim_utils.JointDrivePropertiesCfg(drive_type="force"),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 0.5),

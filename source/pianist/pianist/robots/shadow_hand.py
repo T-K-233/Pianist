@@ -22,11 +22,9 @@ SHADOW_HAND_CFG = ArticulationCfg(
             sleep_threshold=0.005,
             stabilization_threshold=0.0005,
         ),
-        # collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.005, rest_offset=0.0),
         joint_drive_props=sim_utils.JointDrivePropertiesCfg(drive_type="force"),
         fixed_tendons_props=sim_utils.FixedTendonPropertiesCfg(limit_stiffness=30.0, damping=0.1),
     ),
-    # articulation_root_prim_path="/lh_forearm/lh_forearm",
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 0.5),
         rot=(0.0, 0.0, -0.7071, 0.7071),
@@ -52,13 +50,13 @@ SHADOW_HAND_CFG = ArticulationCfg(
                 "THJ(3|2)": 0.99,
             },
             stiffness={
-                "WRJ(X|Y)": 30.0,
+                "WRJ(X|Y)": 300.0,
                 "WRJ(2|1)": 5.0,
                 "(LF|TH)J5": 1.0,
                 "(FF|MF|RF|LF|TH)J(4|3|2)": 1.0,
             },
             damping={
-                "WRJ(X|Y)": 10.0,
+                "WRJ(X|Y)": 100.0,
                 "WRJ(2|1)": 0.5,
                 "(LF|TH)J5": 0.1,
                 "(FF|MF|RF|LF|TH)J(4|3|2)": 0.1,

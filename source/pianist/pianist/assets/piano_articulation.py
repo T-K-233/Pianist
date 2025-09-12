@@ -24,6 +24,11 @@ class PianoArticulation(Articulation):
         self._key_body_indices = torch.tensor(key_body_indices, device=self.device)
         self._key_joint_indices = torch.tensor(key_joint_indices, device=self.device)
 
+        # gives an upward force when the key is at rest
+        spring_ref_position = torch.zeros(1, self.num_joints, device=self.device)
+        spring_ref_position[:] = -0.017453292519943295
+        self.set_joint_position_target(spring_ref_position)
+
     @property
     def key_press_states(self) -> torch.Tensor:
         key_press_normalized = self.data.joint_pos / self.data.default_joint_pos_limits[:, :, 1]

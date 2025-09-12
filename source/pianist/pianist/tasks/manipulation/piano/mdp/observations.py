@@ -13,6 +13,12 @@ def forearm_pos(env: ManagerBasedEnv, robot_asset_cfg: SceneEntityCfg = SceneEnt
     return asset.data.body_pos_w[:, body_index].squeeze(1)
 
 
+def active_fingers(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    """The active fingers of the robot."""
+    command_term = env.command_manager.get_term(command_name)
+    return command_term.active_fingers
+
+
 def piano_key_pos(env: ManagerBasedEnv, piano_asset_cfg: SceneEntityCfg = SceneEntityCfg("piano")) -> torch.Tensor:
     """The joint positions of the asset w.r.t. the default joint positions.
 

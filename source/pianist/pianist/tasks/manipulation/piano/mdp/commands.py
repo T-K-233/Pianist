@@ -66,6 +66,10 @@ class KeyPressCommand(CommandTerm):
         self._key_press_goals = torch.zeros(self.num_envs, 88, device=self.device)
         # target locations of the keys to be pressed, maximum 10 keys (one for each finger)
         self._target_key_locations = torch.zeros(self.num_envs, 1, 3, device=self.device)
+        # active fingers: one-hot vector with 5 elements (thumb, index, middle, ring, pinky)
+        # for now, only index finger (element 1) is active
+        self._active_fingers = torch.zeros(self.num_envs, 5, device=self.device)
+        self._active_fingers[:, 1] = 1.0  # index finger is active
 
         # -- metrics
         self.metrics["fingertip_to_key_distance"] = torch.zeros(self.num_envs, device=self.device)
@@ -89,14 +93,7 @@ class KeyPressCommand(CommandTerm):
 
         The first three elements correspond to the position, followed by the quaternion orientation in (w, x, y, z).
         """
-        # return self.keypress_command
-        return torch.cat(
-            [
-                self.key_press_goals,
-                self.target_key_locations.flatten(start_dim=1),
-            ],
-            dim=1,
-        )
+        return self.key_press_goals
 
     @property
     def key_press_goals(self) -> torch.Tensor:
@@ -114,6 +111,10 @@ class KeyPressCommand(CommandTerm):
     def fingertip_positions(self) -> torch.Tensor:
         return self.robot.data.body_pos_w[:, self._finger_body_indices]
 
+    @property
+    def active_fingers(self) -> torch.Tensor:
+        return self._active_fingers
+
     """
     Implementation specific functions.
     """
@@ -121,11 +122,16 @@ class KeyPressCommand(CommandTerm):
     def _update_metrics(self):
         # compute the error
         pos_error = torch.norm(self._target_key_locations - self.fingertip_positions, dim=-1).mean(dim=-1)
+        key_on_threshold = self.cfg.key_close_enough_to_pressed
 
-        correctly_pressed_percentage = ((self.key_press_goals > 0.5) * (torch.abs(self.key_press_goals - self.key_press_actual) < 0.2)).sum(dim=-1).float() / self.key_press_goals.sum(dim=-1)
-        correctly_not_pressed_percentage = ((self.key_press_goals < 0.5) * (torch.abs(self.key_press_goals - self.key_press_actual) < 0.2)).sum(dim=-1).float() / (NUM_KEYS - self.key_press_goals.sum(dim=-1))
+        correctly_pressed_percentage = (
+            (self.key_press_goals > 0.5) * (torch.abs(self.key_press_goals - self.key_press_actual) < key_on_threshold)
+        ).sum(dim=-1).float() / self.key_press_goals.sum(dim=-1)
+        correctly_not_pressed_percentage = (
+            (self.key_press_goals < 0.5) * (torch.abs(self.key_press_goals - self.key_press_actual) < key_on_threshold)
+        ).sum(dim=-1).float() / (NUM_KEYS - self.key_press_goals.sum(dim=-1))
 
-        f1_score = (torch.abs(self.key_press_goals - self.key_press_actual) < 0.2).sum(dim=-1).float() / NUM_KEYS
+        f1_score = (torch.abs(self.key_press_goals - self.key_press_actual) < key_on_threshold).sum(dim=-1).float() / NUM_KEYS
 
         self.metrics["fingertip_to_key_distance"] = pos_error
         self.metrics["correctly_pressed"] = correctly_pressed_percentage
@@ -189,6 +195,9 @@ class KeyPressCommandCfg(CommandTermCfg):
 
     # robot_finger_body_names: list[str] = MISSING
     # """Names of the robot finger bodies for which the commands are generated."""
+
+    key_close_enough_to_pressed: float = 0.05
+    """The threshold for the key to be considered pressed."""
 
     goal_pose_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/Command/goal_pose")
     """The configuration for the goal pose visualization marker. Defaults to FRAME_MARKER_CFG."""

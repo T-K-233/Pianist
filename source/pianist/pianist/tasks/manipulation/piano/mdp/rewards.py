@@ -8,10 +8,6 @@ from isaaclab.envs import ManagerBasedRLEnv
 from pianist.tasks.manipulation.piano.mdp.commands import KeyPressCommand
 
 
-FINGER_CLOSE_ENOUGH_TO_KEY = 0.01
-KEY_CLOSE_ENOUGH_TO_PRESSED = 0.05
-
-
 def gaussian_sigmoid_func(
     x: torch.Tensor,
     value_at_margin: float
@@ -70,7 +66,11 @@ def gaussian_tolerance(
     return value
 
 
-def key_press_reward(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:
+def key_press_reward(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    key_close_enough_to_pressed: float = 0.05,
+) -> torch.Tensor:
     """Reward for pressing the right keys at the right time."""
 
     # piano: Articulation = env.scene[piano_entity_cfg.name]
@@ -105,8 +105,8 @@ def key_press_reward(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:
     # rewards += 0.5 * torch.abs(keypress_command[on_keys] - piano_key_press_state[on_keys]).mean(dim=-1)
     on_key_rewards = gaussian_tolerance(
         key_press_goal[on_keys] - key_press_actual[on_keys],
-        bounds=(0.0, KEY_CLOSE_ENOUGH_TO_PRESSED),
-        margin=KEY_CLOSE_ENOUGH_TO_PRESSED * 10,
+        bounds=(0.0, key_close_enough_to_pressed),
+        margin=key_close_enough_to_pressed * 10,
     )
     rewards[:] += 0.5 * on_key_rewards.mean(dim=-1)
 
@@ -153,7 +153,12 @@ def fingertip_to_key_distance_l2(env: ManagerBasedRLEnv, command_name: str, asse
     return torch.mean(distances, dim=-1)
 
 
-def fingertip_to_key_distance_reward(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+def fingertip_to_key_distance_reward(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    asset_cfg: SceneEntityCfg,
+    finger_close_enough_to_key: float = 0.01,
+) -> torch.Tensor:
     """
     the fingering_reward
     """
@@ -161,8 +166,8 @@ def fingertip_to_key_distance_reward(env: ManagerBasedRLEnv, command_name: str, 
 
     distance_rewards = gaussian_tolerance(
         distances.flatten(start_dim=1),
-        bounds=(0, FINGER_CLOSE_ENOUGH_TO_KEY),
-        margin=(FINGER_CLOSE_ENOUGH_TO_KEY * 10),
+        bounds=(0, finger_close_enough_to_key),
+        margin=(finger_close_enough_to_key * 10),
     )
     rewards = distance_rewards.mean(dim=-1)
 
