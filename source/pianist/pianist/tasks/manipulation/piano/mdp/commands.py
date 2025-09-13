@@ -55,22 +55,26 @@ class KeyPressCommand(CommandTerm):
         robot_finger_body_names = ["ffdistal"]
 
         # extract the robot and body index for which the command is generated
-        self.robot: Articulation = env.scene[robot_name]
+        if not self.cfg.self_playing:
+            self.robot: Articulation = env.scene[robot_name]
         self.piano: PianoArticulation = env.scene[piano_name]
         self.piano.manual_init()
 
-        finger_body_indices, _ = self.robot.find_bodies(robot_finger_body_names)
-        self._finger_body_indices = torch.tensor(finger_body_indices, device=self.device)
+        if not self.cfg.self_playing:
+            finger_body_indices, _ = self.robot.find_bodies(robot_finger_body_names)
+            self._finger_body_indices = torch.tensor(finger_body_indices, device=self.device)
 
         # create buffers
         # discrete command to indicate if the key needs to be pressed
         self._key_press_goals = torch.zeros(self.num_envs, 88, device=self.device)
         # target locations of the keys to be pressed, maximum 10 keys (one for each finger)
         self._target_key_locations = torch.zeros(self.num_envs, 1, 3, device=self.device)
-        # active fingers: one-hot vector with 5 elements (thumb, index, middle, ring, pinky)
-        # for now, only index finger (element 1) is active
-        self._active_fingers = torch.zeros(self.num_envs, 5, device=self.device)
-        self._active_fingers[:, 1] = 1.0  # index finger is active
+
+        if not self.cfg.self_playing:
+            # active fingers: one-hot vector with 5 elements (thumb, index, middle, ring, pinky)
+            # for now, only index finger (element 1) is active
+            self._active_fingers = torch.zeros(self.num_envs, 5, device=self.device)
+            self._active_fingers[:, 1] = 1.0  # index finger is active
 
         # -- metrics
         self.metrics["fingertip_to_key_distance"] = torch.zeros(self.num_envs, device=self.device)
@@ -122,8 +126,10 @@ class KeyPressCommand(CommandTerm):
 
     def _update_metrics(self):
         # compute the error
-        pos_error = torch.norm(self._target_key_locations - self.fingertip_positions, dim=-1).mean(dim=-1)
         key_on_threshold = self.cfg.key_close_enough_to_pressed
+
+        if not self.cfg.self_playing:
+            pos_error = torch.norm(self._target_key_locations - self.fingertip_positions, dim=-1).mean(dim=-1)
 
         correctly_pressed_percentage = (
             (self.key_press_goals > 0.5) * (torch.abs(self.key_press_goals - self.key_press_actual) < key_on_threshold)
@@ -134,7 +140,8 @@ class KeyPressCommand(CommandTerm):
 
         f1_score = (torch.abs(self.key_press_goals - self.key_press_actual) < key_on_threshold).sum(dim=-1).float() / NUM_KEYS
 
-        self.metrics["fingertip_to_key_distance"] = pos_error
+        if not self.cfg.self_playing:
+            self.metrics["fingertip_to_key_distance"] = pos_error
         self.metrics["correctly_pressed"] = correctly_pressed_percentage
         self.metrics["correctly_not_pressed"] = correctly_not_pressed_percentage
         self.metrics["f1"] = f1_score
@@ -170,16 +177,22 @@ class KeyPressCommand(CommandTerm):
     def _debug_vis_callback(self, event):
         # check if robot is initialized
         # note: this is needed in-case the robot is de-initialized. we can't access the data
-        if not self.robot.is_initialized:
-            return
-        # update the markers
-        # -- goal pose
-        loc = self.target_key_locations[:, 0, 0:3]
-        self.goal_key_visualizer.visualize(loc)
-        # -- current body pose
-        finger_quat = self.robot.data.body_quat_w[:, self._finger_body_indices][:, 0]
-        pos = self.fingertip_positions[:, 0]
-        self.current_key_visualizer.visualize(pos, finger_quat)
+        if not self.cfg.self_playing:
+            if not self.robot.is_initialized:
+                return
+            # update the markers
+            # -- goal pose
+            loc = self.target_key_locations[:, 0, 0:3]
+            self.goal_key_visualizer.visualize(loc)
+            # -- current body pose
+            finger_quat = self.robot.data.body_quat_w[:, self._finger_body_indices][:, 0]
+            pos = self.fingertip_positions[:, 0]
+            self.current_key_visualizer.visualize(pos, finger_quat)
+        else:
+            loc = self.target_key_locations[:, 0, 0:3]
+            self.goal_key_visualizer.visualize(loc)
+            self.current_key_visualizer.visualize(loc)
+
 
 
 @configclass
@@ -221,3 +234,6 @@ class KeyPressCommandCfg(CommandTermCfg):
         },
     )
     """The configuration for the current pose visualization marker."""
+
+    self_playing: bool = False
+    """Whether the command is for self-playing."""
