@@ -52,7 +52,7 @@ class KeyPressCommand(CommandTerm):
         # TODO: move these to the cfg
         robot_name = "robot"
         piano_name = "piano"
-        robot_finger_body_names = ["ffdistal"]
+        robot_finger_body_names = ["fftip"]
 
         # extract the robot and body index for which the command is generated
         self.robot: Articulation = env.scene[robot_name]

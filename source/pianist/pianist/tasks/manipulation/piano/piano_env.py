@@ -9,6 +9,7 @@ from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
+from isaaclab.sensors import ContactSensorCfg
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
@@ -51,6 +52,11 @@ class PianoSceneCfg(InteractiveSceneCfg):
 
     # robots
     robot: ArticulationCfg = MISSING
+    contact_forces = ContactSensorCfg(
+        prim_path="{ENV_REGEX_NS}/robot/.*",
+        history_length=3,
+        track_air_time=False,
+    )
 
     # lights
     light = AssetBaseCfg(
@@ -84,7 +90,7 @@ class ObservationsCfg:
         """Observations for policy group."""
 
         # observation terms (order preserved)
-        piano_key_goal_state = ObsTerm(func=mdp.generated_commands, params={"command_name": "keypress"})
+        piano_key_goal = ObsTerm(func=mdp.generated_commands, params={"command_name": "keypress"})
         forearm_pos = ObsTerm(func=mdp.forearm_pos, params={"robot_asset_cfg": SceneEntityCfg("robot")})
         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
         active_fingers = ObsTerm(func=mdp.active_fingers, params={"command_name": "keypress"})
@@ -122,7 +128,7 @@ class RewardsCfg:
             "command_name": "keypress",
             "key_close_enough_to_pressed": KEY_CLOSE_ENOUGH_TO_PRESSED,
         },
-        weight=1.0,
+        weight=4.0,
     )
     energy = RewTerm(
         func=mdp.energy_reward,
@@ -136,12 +142,40 @@ class RewardsCfg:
             "asset_cfg": SceneEntityCfg("robot"),
             "finger_close_enough_to_key": FINGER_CLOSE_ENOUGH_TO_KEY,
         },
-        weight=1.0,
+        weight=0.1,
     )
     # sustain_pedal = RewTerm(
     #     func=mdp.sustain_pedal_reward,
     #     weight=-1e-4,
     # )
+    action_rate = RewTerm(
+        func=mdp.action_rate_l2,
+        weight=-0.001,
+    )
+    joint_deviation_yaw = RewTerm(
+        func=mdp.joint_deviation_l1,
+        params={
+            "asset_cfg": SceneEntityCfg(
+                "robot",
+                joint_names=[
+                    "WRJ2",
+                ],
+            )
+        },
+        weight=-0.1,
+    )
+    undesired_contacts = RewTerm(
+        func=mdp.undesired_contacts,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=[
+                "palm",
+                ".*proximal",
+                ".*middle",
+            ]),
+            "threshold": 1.0,
+        },
+        weight=-1.0,
+    )
 
 
 @configclass

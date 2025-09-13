@@ -12,7 +12,7 @@ class ShadowHandCfg(PianoEnvCfg):
         # post init of parent
         super().__post_init__()
 
-        self.scene.robot = SHADOW_HAND_CFG.replace(prim_path="/World/envs/env_.*/robot").replace(
+        self.scene.robot = SHADOW_HAND_CFG.replace(prim_path="{ENV_REGEX_NS}/robot").replace(
             init_state=ArticulationCfg.InitialStateCfg(
                 pos=(-0.4, 0.0, 0.55),
                 # pos=(-0.35, 0.0, 0.6),
