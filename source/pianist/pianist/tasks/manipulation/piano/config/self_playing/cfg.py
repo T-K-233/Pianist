@@ -9,10 +9,10 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.utils import configclass
+from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, RslRlPpoAlgorithmCfg
 
 import pianist.tasks.manipulation.piano.mdp as mdp
 from pianist.assets.piano_cfg import PIANO_CFG
-from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, RslRlPpoAlgorithmCfg
 
 
 KEY_CLOSE_ENOUGH_TO_PRESSED = 0.05
@@ -46,10 +46,12 @@ class SelfPlayingPianoSceneCfg(InteractiveSceneCfg):
 class CommandsCfg:
     """Command terms for the MDP."""
 
-    keypress = mdp.KeyPressCommandCfg(
-        resampling_time_range=(1.0, 4.0),
+    keypress = mdp.RandomKeyPressCommandCfg(
+        resampling_time_range=(0.5, 2.0),
+        piano_name="piano",
+        robot_name=None,  # no robot in self-playing mode
+        robot_finger_body_names=None,
         key_close_enough_to_pressed=KEY_CLOSE_ENOUGH_TO_PRESSED,
-        self_playing=True,
         debug_vis=True,
     )
 
@@ -80,8 +82,7 @@ class ActionsCfg:
     joint_pos = mdp.JointPositionActionCfg(
         asset_name="piano",
         joint_names=[".*"],
-        scale=1.0,
-        preserve_order=True,
+        scale=0.2,
         use_default_offset=True,
     )
 
@@ -91,18 +92,33 @@ class RewardsCfg:
     """Reward terms for the MDP."""
 
     # task terms
-    key_press = RewTerm(
-        func=mdp.key_press_reward,
+    key_on = RewTerm(
+        func=mdp.key_on_reward,
         params={
             "command_name": "keypress",
             "key_close_enough_to_pressed": KEY_CLOSE_ENOUGH_TO_PRESSED,
         },
-        weight=4.0,
+        weight=1.0,
+    )
+    key_off = RewTerm(
+        func=mdp.key_off_reward,
+        params={
+            "command_name": "keypress",
+            "key_close_enough_to_pressed": KEY_CLOSE_ENOUGH_TO_PRESSED,
+        },
+        weight=1.0,
     )
     energy = RewTerm(
         func=mdp.energy_reward,
         params={"robot_asset_cfg": SceneEntityCfg("piano")},
         weight=-5e-3,
+    )
+
+    # we want to reproduce the same sparse key presses
+    joint_deviation = RewTerm(
+        func=mdp.joint_deviation_l1,
+        params={"asset_cfg": SceneEntityCfg("piano", joint_names=[".*"])},
+        weight=-1.0,
     )
 
 

@@ -1,45 +1,37 @@
-
-from isaaclab.managers import CommandTermCfg
-from isaaclab.markers import VisualizationMarkersCfg
-from isaaclab.markers.config import CUBOID_MARKER_CFG, SPHERE_MARKER_CFG
-from isaaclab.utils import configclass
+from collections.abc import Sequence
+from dataclasses import MISSING
 
 import torch
-from collections.abc import Sequence
-
 import isaaclab.sim as sim_utils
 from isaaclab.assets import Articulation
 from isaaclab.envs import ManagerBasedRLEnv
-from isaaclab.managers import CommandTerm
-from isaaclab.markers import VisualizationMarkers
+from isaaclab.managers import CommandTermCfg, CommandTerm
+from isaaclab.markers import VisualizationMarkersCfg, VisualizationMarkers
+from isaaclab.utils import configclass
 
 from pianist.assets.piano_articulation import PianoArticulation
 from pianist.assets.piano_constants import NUM_KEYS
 
 
-class KeyPressCommand(CommandTerm):
-    """Command generator for generating pose commands uniformly.
+FINGERTIP_COLORS = [
+    # Important: the order of these colors should not be changed.
+    (0.8, 0.2, 0.8),  # Purple.
+    (0.8, 0.2, 0.2),  # Red.
+    (0.2, 0.8, 0.8),  # Cyan.
+    (0.2, 0.2, 0.8),  # Blue.
+    (0.8, 0.8, 0.2),  # Yellow.
+]
 
-    The command generator generates poses by sampling positions uniformly within specified
-    regions in cartesian space. For orientation, it samples uniformly the euler angles
-    (roll-pitch-yaw) and converts them into quaternion representation (w, x, y, z).
 
-    The position and orientation commands are generated in the base frame of the robot, and not the
-    simulation world frame. This means that users need to handle the transformation from the
-    base frame to the simulation world frame themselves.
-
-    .. caution::
-
-        Sampling orientations uniformly is not strictly the same as sampling euler angles uniformly.
-        This is because rotations are defined by 3D non-Euclidean space, and the mapping
-        from euler angles to rotations is not one-to-one.
-
+class RandomKeyPressCommand(CommandTerm):
+    """
+    This command generates random key press commands.
     """
 
-    cfg: "KeyPressCommandCfg"
+    cfg: "RandomKeyPressCommandCfg"
     """Configuration for the command generator."""
 
-    def __init__(self, cfg: "KeyPressCommandCfg", env: ManagerBasedRLEnv):
+    def __init__(self, cfg: "RandomKeyPressCommandCfg", env: ManagerBasedRLEnv):
         """Initialize the command generator class.
 
         Args:
@@ -49,41 +41,36 @@ class KeyPressCommand(CommandTerm):
         # initialize the base class
         super().__init__(cfg, env)
 
-        # TODO: move these to the cfg
-        robot_name = "robot"
-        piano_name = "piano"
-        robot_finger_body_names = ["ffdistal"]
-
         # extract the robot and body index for which the command is generated
-        if not self.cfg.self_playing:
-            self.robot: Articulation = env.scene[robot_name]
-        self.piano: PianoArticulation = env.scene[piano_name]
+        self.piano: PianoArticulation = env.scene[self.cfg.piano_name]
         self.piano.manual_init()
 
-        if not self.cfg.self_playing:
-            finger_body_indices, _ = self.robot.find_bodies(robot_finger_body_names)
+        if self.cfg.robot_name:
+            self.robot: Articulation = env.scene[self.cfg.robot_name]
+            finger_body_indices, _ = self.robot.find_bodies(self.cfg.robot_finger_body_names)
             self._finger_body_indices = torch.tensor(finger_body_indices, device=self.device)
 
         # create buffers
         # discrete command to indicate if the key needs to be pressed
         self._key_press_goals = torch.zeros(self.num_envs, 88, device=self.device)
         # target locations of the keys to be pressed, maximum 10 keys (one for each finger)
-        self._target_key_locations = torch.zeros(self.num_envs, 1, 3, device=self.device)
+        self._target_key_locations = torch.zeros(self.num_envs, self.cfg.max_num_notes, 3, device=self.device)
 
-        if not self.cfg.self_playing:
+        if self.cfg.robot_name:
             # active fingers: one-hot vector with 5 elements (thumb, index, middle, ring, pinky)
             # for now, only index finger (element 1) is active
             self._active_fingers = torch.zeros(self.num_envs, 5, device=self.device)
             self._active_fingers[:, 1] = 1.0  # index finger is active
 
         # -- metrics
-        self.metrics["fingertip_to_key_distance"] = torch.zeros(self.num_envs, device=self.device)
+        if self.cfg.robot_name:
+            self.metrics["fingertip_to_key_distance"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["correctly_pressed"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["correctly_not_pressed"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["f1"] = torch.zeros(self.num_envs, device=self.device)
 
     def __str__(self) -> str:
-        msg = "KeyPressCommand:\n"
+        msg = "RandomKeyPressCommand:\n"
         msg += f"\tCommand dimension: {tuple(self.command.shape[1:])}\n"
         msg += f"\tResampling time range: {self.cfg.resampling_time_range}\n"
         return msg
@@ -128,7 +115,7 @@ class KeyPressCommand(CommandTerm):
         # compute the error
         key_on_threshold = self.cfg.key_close_enough_to_pressed
 
-        if not self.cfg.self_playing:
+        if self.cfg.robot_name:
             pos_error = torch.norm(self._target_key_locations - self.fingertip_positions, dim=-1).mean(dim=-1)
 
         correctly_pressed_percentage = (
@@ -140,7 +127,7 @@ class KeyPressCommand(CommandTerm):
 
         f1_score = (torch.abs(self.key_press_goals - self.key_press_actual) < key_on_threshold).sum(dim=-1).float() / NUM_KEYS
 
-        if not self.cfg.self_playing:
+        if self.cfg.robot_name:
             self.metrics["fingertip_to_key_distance"] = pos_error
         self.metrics["correctly_pressed"] = correctly_pressed_percentage
         self.metrics["correctly_not_pressed"] = correctly_not_pressed_percentage
@@ -149,76 +136,105 @@ class KeyPressCommand(CommandTerm):
     def _resample_command(self, env_ids: Sequence[int]):
         # sample new pose targets
         # -- position
-        random_note_index = torch.randint(20, 60, (len(env_ids),), device=self.device)
+        key_indices = torch.zeros(len(env_ids), self.cfg.max_num_notes, dtype=torch.int32, device=self.device)
+        base = torch.randint(20, 60, (len(env_ids), 1), device=self.device)
+        key_indices[:, :] = base
+        for i in range(1, self.cfg.max_num_notes):
+            offset = torch.randint(1, 5, (len(env_ids), 1), device=self.device)
+            key_indices[:, i:] += offset
+
         self._key_press_goals[env_ids, :] = 0
-        self._key_press_goals[env_ids, random_note_index] = 1
-        target_locations = self.piano.get_key_world_locations(env_ids, random_note_index)
-        self._target_key_locations[env_ids, 0, 0:3] = target_locations
+
+        # Convert env_ids to tensor and create proper indexing
+        env_ids_sel = torch.tensor(env_ids, device=self.device).unsqueeze(1).expand(-1, self.cfg.max_num_notes)
+        self._key_press_goals[env_ids_sel, key_indices] = 1
+
+        target_locations = self.piano.get_key_world_locations(env_ids_sel, key_indices)
+        self._target_key_locations[env_ids, :, :] = 0
+        self._target_key_locations[env_ids, :target_locations.shape[1], 0:3] = target_locations
 
     def _update_command(self):
         pass
+        # self.piano.write_joint_position_to_sim(self._key_press_goals, self.piano._key_joint_indices)
 
     def _set_debug_vis_impl(self, debug_vis: bool):
         # create markers if necessary for the first time
         if debug_vis:
             if not hasattr(self, "goal_key_visualizer"):
                 # -- goal pose
-                self.goal_key_visualizer = VisualizationMarkers(self.cfg.goal_key_visualizer_cfg)
+                self.goal_key_visualizers = []
+                for i in range(self.cfg.max_num_notes):
+                    cfg = self.cfg.goal_key_visualizer_cfg.copy()
+                    cfg.markers["cuboid"].visual_material.diffuse_color = FINGERTIP_COLORS[i]
+                    self.goal_key_visualizers.append(VisualizationMarkers(cfg))
                 # -- current body pose
-                self.current_key_visualizer = VisualizationMarkers(self.cfg.current_key_visualizer_cfg)
+                self.current_key_visualizers = []
+                for i in range(self.cfg.max_num_notes):
+                    cfg = self.cfg.current_key_visualizer_cfg.copy()
+                    cfg.markers["sphere"].visual_material.diffuse_color = FINGERTIP_COLORS[i]
+                    self.current_key_visualizers.append(VisualizationMarkers(cfg))
             # set their visibility to true
-            self.goal_key_visualizer.set_visibility(True)
-            self.current_key_visualizer.set_visibility(True)
+            for goal_key_visualizer in self.goal_key_visualizers:
+                goal_key_visualizer.set_visibility(True)
+            for current_key_visualizer in self.current_key_visualizers:
+                current_key_visualizer.set_visibility(True)
         else:
-            if hasattr(self, "goal_key_visualizer"):
-                self.goal_key_visualizer.set_visibility(False)
-                self.current_key_visualizer.set_visibility(False)
+            if hasattr(self, "goal_key_visualizers"):
+                for goal_key_visualizer in self.goal_key_visualizers:
+                    goal_key_visualizer.set_visibility(False)
+                for current_key_visualizer in self.current_key_visualizers:
+                    current_key_visualizer.set_visibility(False)
 
     def _debug_vis_callback(self, event):
         # check if robot is initialized
         # note: this is needed in-case the robot is de-initialized. we can't access the data
-        if not self.cfg.self_playing:
+        if self.cfg.robot_name:
             if not self.robot.is_initialized:
                 return
             # update the markers
             # -- goal pose
-            loc = self.target_key_locations[:, 0, 0:3]
-            self.goal_key_visualizer.visualize(loc)
+            for i in range(self.cfg.max_num_notes):
+                loc = self.target_key_locations[:, i, 0:3]
+                self.goal_key_visualizers[i].visualize(loc)
             # -- current body pose
             finger_quat = self.robot.data.body_quat_w[:, self._finger_body_indices][:, 0]
-            pos = self.fingertip_positions[:, 0]
-            self.current_key_visualizer.visualize(pos, finger_quat)
+            for i in range(self.cfg.max_num_notes):
+                pos = self.fingertip_positions[:, i]
+                self.current_key_visualizers[i].visualize(pos, finger_quat)
         else:
-            loc = self.target_key_locations[:, 0, 0:3]
-            self.goal_key_visualizer.visualize(loc)
-            self.current_key_visualizer.visualize(loc)
-
+            for i in range(self.cfg.max_num_notes):
+                loc = self.target_key_locations[:, i, 0:3]
+                self.goal_key_visualizers[i].visualize(loc)
+                self.current_key_visualizers[i].visualize(loc)
 
 
 @configclass
-class KeyPressCommandCfg(CommandTermCfg):
-    """Configuration for uniform pose command generator."""
+class RandomKeyPressCommandCfg(CommandTermCfg):
+    """Configuration for random key press command generator."""
 
-    class_type: type = KeyPressCommand
+    class_type: type = RandomKeyPressCommand
 
-    # robot_name: str = MISSING
-    # """Name of the robot in the environment for which the commands are generated."""
+    piano_name: str = MISSING
+    """Name of the piano in the environment for which the commands are generated."""
 
-    # piano_name: str = MISSING
-    # """Name of the piano in the environment for which the commands are generated."""
+    robot_name: str = MISSING
+    """Name of the robot in the environment for which the commands are generated."""
 
-    # robot_finger_body_names: list[str] = MISSING
-    # """Names of the robot finger bodies for which the commands are generated."""
+    robot_finger_body_names: list[str] = MISSING
+    """Names of the robot finger bodies for which the commands are generated."""
 
     key_close_enough_to_pressed: float = 0.05
     """The threshold for the key to be considered pressed."""
+
+    max_num_notes: int = 3
+    """The number of notes to generate."""
 
     goal_key_visualizer_cfg = VisualizationMarkersCfg(
         prim_path="/Visuals/Command/goal_pos",
         markers={
             "cuboid": sim_utils.CuboidCfg(
                 size=(0.05, 0.02, 0.025),
-                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0)),
+                visual_material=sim_utils.PreviewSurfaceCfg(),
             ),
         },
     )
@@ -229,11 +245,8 @@ class KeyPressCommandCfg(CommandTermCfg):
         markers={
             "sphere": sim_utils.SphereCfg(
                 radius=0.01,
-                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0)),
+                visual_material=sim_utils.PreviewSurfaceCfg(),
             ),
         },
     )
     """The configuration for the current pose visualization marker."""
-
-    self_playing: bool = False
-    """Whether the command is for self-playing."""

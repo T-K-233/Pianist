@@ -67,8 +67,10 @@ class PianoSceneCfg(InteractiveSceneCfg):
 class CommandsCfg:
     """Command terms for the MDP."""
 
-    keypress = mdp.KeyPressCommandCfg(
-        # asset_name="robot",
+    keypress = mdp.RandomKeyPressCommandCfg(
+        piano_name="piano",
+        robot_name="robot",
+        robot_finger_body_names=["ffdistal"],
         resampling_time_range=(1.0, 4.0),
         key_close_enough_to_pressed=KEY_CLOSE_ENOUGH_TO_PRESSED,
         debug_vis=True,
@@ -116,8 +118,16 @@ class RewardsCfg:
     """Reward terms for the MDP."""
 
     # task terms
-    key_press = RewTerm(
-        func=mdp.key_press_reward,
+    key_on = RewTerm(
+        func=mdp.key_on_reward,
+        params={
+            "command_name": "keypress",
+            "key_close_enough_to_pressed": KEY_CLOSE_ENOUGH_TO_PRESSED,
+        },
+        weight=1.0,
+    )
+    key_off = RewTerm(
+        func=mdp.key_off_reward,
         params={
             "command_name": "keypress",
             "key_close_enough_to_pressed": KEY_CLOSE_ENOUGH_TO_PRESSED,
