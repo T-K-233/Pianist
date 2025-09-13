@@ -1,18 +1,20 @@
 
 from isaaclab.managers import CommandTermCfg
 from isaaclab.markers import VisualizationMarkersCfg
-from isaaclab.markers.config import FRAME_MARKER_CFG
+from isaaclab.markers.config import CUBOID_MARKER_CFG, SPHERE_MARKER_CFG
 from isaaclab.utils import configclass
 
 import torch
 from collections.abc import Sequence
 
+import isaaclab.sim as sim_utils
 from isaaclab.assets import Articulation
 from isaaclab.envs import ManagerBasedRLEnv
 from isaaclab.managers import CommandTerm
 from isaaclab.markers import VisualizationMarkers
 
-from pianist.assets.piano_constants import WHITE_KEY_INDICES, NUM_KEYS, WHITE_KEY_LENGTH
+from pianist.assets.piano_articulation import PianoArticulation
+from pianist.assets.piano_constants import NUM_KEYS
 
 
 class KeyPressCommand(CommandTerm):
@@ -54,31 +56,27 @@ class KeyPressCommand(CommandTerm):
 
         # extract the robot and body index for which the command is generated
         self.robot: Articulation = env.scene[robot_name]
-        self.piano: Articulation = env.scene[piano_name]
-        self.finger_body_indices, _ = self.robot.find_bodies(robot_finger_body_names)
-        self.finger_body_indices = torch.tensor(self.finger_body_indices, device=self.device)
+        self.piano: PianoArticulation = env.scene[piano_name]
+        self.piano.manual_init()
 
-        query_key_names = []
-        for i in range(NUM_KEYS):
-            if i in WHITE_KEY_INDICES:
-                query_key_names.append(f"white_key_{i}")
-            else:
-                query_key_names.append(f"black_key_{i}")
-        self.key_body_indices, _ = self.piano.find_bodies(query_key_names, preserve_order=True)
-        self.key_joint_indices, _ = self.piano.find_joints([name + "_joint" for name in query_key_names], preserve_order=True)
-        self.key_body_indices = torch.tensor(self.key_body_indices, device=self.device)
+        finger_body_indices, _ = self.robot.find_bodies(robot_finger_body_names)
+        self._finger_body_indices = torch.tensor(finger_body_indices, device=self.device)
 
         # create buffers
         # discrete command to indicate if the key needs to be pressed
-        self._keypress_command = torch.zeros(self.num_envs, 88, device=self.device)
-        # target positions of the keys to be pressed, maximum 10 keys (one for each finger)
-        self._keypress_target_positions = torch.zeros(self.num_envs, 1, 3, device=self.device)
+        self._key_press_goals = torch.zeros(self.num_envs, 88, device=self.device)
+        # target locations of the keys to be pressed, maximum 10 keys (one for each finger)
+        self._target_key_locations = torch.zeros(self.num_envs, 1, 3, device=self.device)
+        # active fingers: one-hot vector with 5 elements (thumb, index, middle, ring, pinky)
+        # for now, only index finger (element 1) is active
+        self._active_fingers = torch.zeros(self.num_envs, 5, device=self.device)
+        self._active_fingers[:, 1] = 1.0  # index finger is active
 
         # -- metrics
-        self.metrics["finger_position_error"] = torch.zeros(self.num_envs, device=self.device)
-        self.metrics["correct_pressed"] = torch.zeros(self.num_envs, device=self.device)
-        self.metrics["correct_not_pressed"] = torch.zeros(self.num_envs, device=self.device)
-        self.metrics["f1_error"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["fingertip_to_key_distance"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["correctly_pressed"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["correctly_not_pressed"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["f1"] = torch.zeros(self.num_envs, device=self.device)
 
     def __str__(self) -> str:
         msg = "KeyPressCommand:\n"
@@ -96,28 +94,27 @@ class KeyPressCommand(CommandTerm):
 
         The first three elements correspond to the position, followed by the quaternion orientation in (w, x, y, z).
         """
-        return torch.cat(
-            [
-                self.keypress_command,
-                self.keypress_target_positions.flatten(start_dim=1),
-            ],
-            dim=1,
-        )
+        return self.key_press_goals
 
     @property
-    def keypress_command(self) -> torch.Tensor:
-        return self._keypress_command
+    def key_press_goals(self) -> torch.Tensor:
+        return self._key_press_goals
 
     @property
-    def piano_pressed_status(self) -> torch.Tensor:
-        # print(self.piano.data.joint_pos[:, self.key_joint_indices].max())
-        # max depression is 0.0887 for black and 0.0666 for white
-        keypress_normalized = self.piano.data.joint_pos / self.piano.data.default_joint_pos_limits[:, :, 1]
-        return keypress_normalized[:, self.key_joint_indices]
+    def key_press_actual(self) -> torch.Tensor:
+        return self.piano.key_press_states
 
     @property
-    def keypress_target_positions(self) -> torch.Tensor:
-        return self._keypress_target_positions[:, :, 0:3]
+    def target_key_locations(self) -> torch.Tensor:
+        return self._target_key_locations
+
+    @property
+    def fingertip_positions(self) -> torch.Tensor:
+        return self.robot.data.body_pos_w[:, self._finger_body_indices]
+
+    @property
+    def active_fingers(self) -> torch.Tensor:
+        return self._active_fingers
 
     """
     Implementation specific functions.
@@ -125,28 +122,31 @@ class KeyPressCommand(CommandTerm):
 
     def _update_metrics(self):
         # compute the error
-        fingertip_positions = self.piano.data.body_state_w[:, self.finger_body_indices, 0:3]
-        pos_error = torch.norm(self._keypress_target_positions[:, :, 0:3] - fingertip_positions, dim=-1).mean(dim=-1)
-        self.metrics["finger_position_error"] = pos_error
+        pos_error = torch.norm(self._target_key_locations - self.fingertip_positions, dim=-1).mean(dim=-1)
+        key_on_threshold = self.cfg.key_close_enough_to_pressed
 
-        correct_pressed_percentage = ((self.keypress_command > 0.5) * (torch.abs(self.keypress_command - self.piano_pressed_status) < 0.2)).sum(dim=-1).float() / self.keypress_command.sum(dim=-1)
-        correct_not_pressed_percentage = ((self.keypress_command < 0.5) * (torch.abs(self.keypress_command - self.piano_pressed_status) < 0.2)).sum(dim=-1).float() / (NUM_KEYS - self.keypress_command.sum(dim=-1))
-        f1_score = (torch.abs(self.keypress_command - self.piano_pressed_status) < 0.2).sum(dim=-1).float() / NUM_KEYS
-        self.metrics["correct_pressed"] = correct_pressed_percentage
-        self.metrics["correct_not_pressed"] = correct_not_pressed_percentage
-        self.metrics["f1_error"] = f1_score
+        correctly_pressed_percentage = (
+            (self.key_press_goals > 0.5) * (torch.abs(self.key_press_goals - self.key_press_actual) < key_on_threshold)
+        ).sum(dim=-1).float() / self.key_press_goals.sum(dim=-1)
+        correctly_not_pressed_percentage = (
+            (self.key_press_goals < 0.5) * (torch.abs(self.key_press_goals - self.key_press_actual) < key_on_threshold)
+        ).sum(dim=-1).float() / (NUM_KEYS - self.key_press_goals.sum(dim=-1))
+
+        f1_score = (torch.abs(self.key_press_goals - self.key_press_actual) < key_on_threshold).sum(dim=-1).float() / NUM_KEYS
+
+        self.metrics["fingertip_to_key_distance"] = pos_error
+        self.metrics["correctly_pressed"] = correctly_pressed_percentage
+        self.metrics["correctly_not_pressed"] = correctly_not_pressed_percentage
+        self.metrics["f1"] = f1_score
 
     def _resample_command(self, env_ids: Sequence[int]):
         # sample new pose targets
         # -- position
         random_note_index = torch.randint(20, 60, (len(env_ids),), device=self.device)
-        self._keypress_command[env_ids, :] = 0
-        self._keypress_command[env_ids, random_note_index] = 1
-        body_indices = self.key_body_indices[random_note_index]
-        self._keypress_target_positions[env_ids, 0, 0:3] = self.piano.data.body_state_w[env_ids, body_indices, 0:3]
-
-        # specify the contact position to be at 70% of the white key length
-        self._keypress_target_positions[env_ids, 0, 0] -= 0.7 * WHITE_KEY_LENGTH
+        self._key_press_goals[env_ids, :] = 0
+        self._key_press_goals[env_ids, random_note_index] = 1
+        target_locations = self.piano.get_key_world_locations(env_ids, random_note_index)
+        self._target_key_locations[env_ids, 0, 0:3] = target_locations
 
     def _update_command(self):
         pass
@@ -154,18 +154,18 @@ class KeyPressCommand(CommandTerm):
     def _set_debug_vis_impl(self, debug_vis: bool):
         # create markers if necessary for the first time
         if debug_vis:
-            if not hasattr(self, "goal_pose_visualizer"):
+            if not hasattr(self, "goal_key_visualizer"):
                 # -- goal pose
-                self.goal_pose_visualizer = VisualizationMarkers(self.cfg.goal_pose_visualizer_cfg)
+                self.goal_key_visualizer = VisualizationMarkers(self.cfg.goal_key_visualizer_cfg)
                 # -- current body pose
-                self.current_pose_visualizer = VisualizationMarkers(self.cfg.current_pose_visualizer_cfg)
+                self.current_key_visualizer = VisualizationMarkers(self.cfg.current_key_visualizer_cfg)
             # set their visibility to true
-            self.goal_pose_visualizer.set_visibility(True)
-            self.current_pose_visualizer.set_visibility(True)
+            self.goal_key_visualizer.set_visibility(True)
+            self.current_key_visualizer.set_visibility(True)
         else:
-            if hasattr(self, "goal_pose_visualizer"):
-                self.goal_pose_visualizer.set_visibility(False)
-                self.current_pose_visualizer.set_visibility(False)
+            if hasattr(self, "goal_key_visualizer"):
+                self.goal_key_visualizer.set_visibility(False)
+                self.current_key_visualizer.set_visibility(False)
 
     def _debug_vis_callback(self, event):
         # check if robot is initialized
@@ -174,11 +174,12 @@ class KeyPressCommand(CommandTerm):
             return
         # update the markers
         # -- goal pose
-        piano_key_position = self.keypress_target_positions[:, 0, 0:3]
-        self.goal_pose_visualizer.visualize(piano_key_position)
+        loc = self.target_key_locations[:, 0, 0:3]
+        self.goal_key_visualizer.visualize(loc)
         # -- current body pose
-        body_link_pose_w = self.robot.data.body_link_pose_w[:, self.finger_body_indices]
-        self.current_pose_visualizer.visualize(body_link_pose_w[:, 0, 0:3], body_link_pose_w[:, 0, 3:7])
+        finger_quat = self.robot.data.body_quat_w[:, self._finger_body_indices][:, 0]
+        pos = self.fingertip_positions[:, 0]
+        self.current_key_visualizer.visualize(pos, finger_quat)
 
 
 @configclass
@@ -196,11 +197,27 @@ class KeyPressCommandCfg(CommandTermCfg):
     # robot_finger_body_names: list[str] = MISSING
     # """Names of the robot finger bodies for which the commands are generated."""
 
-    goal_pose_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/Command/goal_pose")
-    """The configuration for the goal pose visualization marker. Defaults to FRAME_MARKER_CFG."""
+    key_close_enough_to_pressed: float = 0.05
+    """The threshold for the key to be considered pressed."""
 
-    current_pose_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/Command/body_pose")
-    """The configuration for the current pose visualization marker. Defaults to FRAME_MARKER_CFG."""
+    goal_key_visualizer_cfg = VisualizationMarkersCfg(
+        prim_path="/Visuals/Command/goal_pos",
+        markers={
+            "cuboid": sim_utils.CuboidCfg(
+                size=(0.05, 0.02, 0.025),
+                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0)),
+            ),
+        },
+    )
+    """The configuration for the goal pose visualization marker."""
 
-    goal_pose_visualizer_cfg.markers["frame"].scale = (0.05, 0.05, 0.05)
-    current_pose_visualizer_cfg.markers["frame"].scale = (0.05, 0.05, 0.05)
+    current_key_visualizer_cfg = VisualizationMarkersCfg(
+        prim_path="/Visuals/Command/body_pos",
+        markers={
+            "sphere": sim_utils.SphereCfg(
+                radius=0.01,
+                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0)),
+            ),
+        },
+    )
+    """The configuration for the current pose visualization marker."""
