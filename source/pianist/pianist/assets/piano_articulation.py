@@ -34,8 +34,8 @@ class PianoArticulation(Articulation):
         self._key_contact_offsets = torch.zeros(self.num_joints, 3, device=self.device)
 
         # specify the contact position to be at 80% of the key length
-        self._key_contact_offsets[WHITE_KEY_INDICES, 0] += -0.7 * WHITE_KEY_LENGTH
-        self._key_contact_offsets[BLACK_KEY_INDICES, 0] += -0.7 * BLACK_KEY_LENGTH
+        self._key_contact_offsets[WHITE_KEY_INDICES, 0] += -0.8 * WHITE_KEY_LENGTH
+        self._key_contact_offsets[BLACK_KEY_INDICES, 0] += -0.8 * BLACK_KEY_LENGTH
         self._key_contact_offsets[BLACK_KEY_INDICES, 2] += BLACK_KEY_HEIGHT
 
         # gives an upward force when the key is at rest
