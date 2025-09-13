@@ -1,8 +1,3 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
-# All rights reserved.
-#
-# SPDX-License-Identifier: BSD-3-Clause
-
 from isaaclab.utils import configclass
 
 from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, RslRlPpoAlgorithmCfg
@@ -17,8 +12,8 @@ class ShadowHandPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     empirical_normalization = True
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=1.0,
-        actor_hidden_dims=[512, 512, 256, 128],
-        critic_hidden_dims=[512, 512, 256, 128],
+        actor_hidden_dims=[512, 256, 128],
+        critic_hidden_dims=[512, 256, 128],
         activation="elu",
     )
     algorithm = RslRlPpoAlgorithmCfg(
