@@ -73,24 +73,24 @@ class PianoSceneCfg(InteractiveSceneCfg):
 class CommandsCfg:
     """Command terms for the MDP."""
 
-    # keypress = mdp.RandomKeyPressCommandCfg(
-    #     piano_name="piano",
-    #     robot_name="robot",
-    #     robot_finger_body_names=["thtip", "fftip", "mftip", "rftip", "lftip"],
-    #     num_notes=3,
-    #     resampling_time_range=(1.0, 4.0),
-    #     key_close_enough_to_pressed=KEY_CLOSE_ENOUGH_TO_PRESSED,
-    #     debug_vis=True,
-    # )
-
-    keypress = mdp.SongKeyPressCommandCfg(
+    keypress = mdp.KeyPressCommandCfg(
+        song_name="simple",
+        # song_name="./source/pianist/data/music/pig_single_finger/nocturne_op9_no_2-1.proto",
         piano_name="piano",
         robot_name="robot",
         robot_finger_body_names=["thtip", "fftip", "mftip", "rftip", "lftip"],
         key_close_enough_to_pressed=KEY_CLOSE_ENOUGH_TO_PRESSED,
         debug_vis=True,
-        midi_file="./source/pianist/data/music/pig_single_finger/nocturne_op9_no_2-1.proto",
     )
+
+    # keypress = mdp.SongKeyPressCommandCfg(
+    #     piano_name="piano",
+    #     robot_name="robot",
+    #     robot_finger_body_names=["thtip", "fftip", "mftip", "rftip", "lftip"],
+    #     key_close_enough_to_pressed=KEY_CLOSE_ENOUGH_TO_PRESSED,
+    #     debug_vis=True,
+    #     midi_file="./source/pianist/data/music/pig_single_finger/nocturne_op9_no_2-1.proto",
+    # )
 
 
 @configclass

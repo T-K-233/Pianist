@@ -43,25 +43,12 @@ class SelfPlayingPianoSceneCfg(InteractiveSceneCfg):
 ##
 
 @configclass
-class SongCommandsCfg:
+class CommandsCfg:
     """Command terms for the MDP."""
 
-    keypress = mdp.SongKeyPressCommandCfg(
-        piano_name="piano",
-        robot_name=None,  # no robot in self-playing mode
-        robot_finger_body_names=None,
-        key_close_enough_to_pressed=KEY_CLOSE_ENOUGH_TO_PRESSED,
-        debug_vis=True,
-        midi_file="./source/pianist/data/music/pig_single_finger/nocturne_op9_no_2-1.proto",
-    )
-
-
-@configclass
-class RandomCommandsCfg:
-    """Command terms for the MDP."""
-
-    keypress = mdp.RandomKeyPressCommandCfg(
-        resampling_time_range=(0.5, 2.0),
+    keypress = mdp.KeyPressCommandCfg(
+        # song_name="simple",
+        song_name="./source/pianist/data/music/pig_single_finger/nocturne_op9_no_2-1.proto",
         piano_name="piano",
         robot_name=None,  # no robot in self-playing mode
         robot_finger_body_names=None,
@@ -133,7 +120,7 @@ class RewardsCfg:
     joint_deviation = RewTerm(
         func=mdp.joint_deviation_l1,
         params={"asset_cfg": SceneEntityCfg("piano", joint_names=[".*"])},
-        weight=-0.2,
+        weight=-0.5,
     )
 
 
@@ -145,7 +132,7 @@ class TerminationsCfg:
 
 
 @configclass
-class EventCfg:
+class EventsCfg:
     """Configuration for events."""
 
     pass
@@ -162,7 +149,7 @@ class SelfPlayingPianoEnvCfg(ManagerBasedRLEnvCfg):
     scene: SelfPlayingPianoSceneCfg = SelfPlayingPianoSceneCfg(num_envs=1024, env_spacing=2.5)
 
     # Policy commands
-    commands: SongCommandsCfg = SongCommandsCfg()
+    commands: CommandsCfg = CommandsCfg()
 
     # Policy observations
     observations: ObservationsCfg = ObservationsCfg()
@@ -177,7 +164,7 @@ class SelfPlayingPianoEnvCfg(ManagerBasedRLEnvCfg):
     terminations: TerminationsCfg = TerminationsCfg()
 
     # Randomization events
-    # events: EventsCfg = EventsCfg()
+    events: EventsCfg = EventsCfg()
 
     def __post_init__(self):
         """Post initialization."""
@@ -192,14 +179,6 @@ class SelfPlayingPianoEnvCfg(ManagerBasedRLEnvCfg):
 
 
 @configclass
-class SelfPlayingPianoRandomEnvCfg(SelfPlayingPianoEnvCfg):
-    """Configuration for the piano environment."""
-
-    # Policy commands
-    commands: RandomCommandsCfg = RandomCommandsCfg()
-
-
-@configclass
 class SelfPlayingPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 16
     max_iterations = 20000
@@ -210,8 +189,6 @@ class SelfPlayingPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         init_noise_std=1.0,
         actor_hidden_dims=[512, 256, 128],
         critic_hidden_dims=[512, 256, 128],
-        # actor_hidden_dims=[256, 128, 128],
-        # critic_hidden_dims=[256, 128, 128],
         activation="elu",
     )
     algorithm = RslRlPpoAlgorithmCfg(

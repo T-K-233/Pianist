@@ -28,6 +28,8 @@ class PianoArticulation(Articulation):
         joint_names = [name + "_joint" for name in self.key_names]
         key_body_indices, _ = self.find_bodies(self.key_names, preserve_order=True)
         key_joint_indices, _ = self.find_joints(joint_names, preserve_order=True)
+
+        # ensure these are 1D tensors
         self._key_body_indices = torch.tensor(key_body_indices, device=self.device)
         self._key_joint_indices = torch.tensor(key_joint_indices, device=self.device)
 
