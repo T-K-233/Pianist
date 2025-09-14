@@ -6,6 +6,12 @@ from isaaclab.managers import SceneEntityCfg
 from pianist.assets.piano_articulation import PianoArticulation
 
 
+def active_fingers(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    """The active fingers of the robot."""
+    command_term = env.command_manager.get_term(command_name)
+    return command_term.active_fingers
+
+
 def forearm_pos(env: ManagerBasedEnv, robot_asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     """The position of the forearm w.r.t. the world.
     """
@@ -13,12 +19,6 @@ def forearm_pos(env: ManagerBasedEnv, robot_asset_cfg: SceneEntityCfg = SceneEnt
     asset: Articulation = env.scene[robot_asset_cfg.name]
     body_index, _ = asset.find_bodies(["forearm"])
     return asset.data.body_pos_w[:, body_index].squeeze(1)
-
-
-def active_fingers(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
-    """The active fingers of the robot."""
-    command_term = env.command_manager.get_term(command_name)
-    return command_term.active_fingers
 
 
 def piano_key_pos(env: ManagerBasedEnv, piano_asset_cfg: SceneEntityCfg = SceneEntityCfg("piano")) -> torch.Tensor:
