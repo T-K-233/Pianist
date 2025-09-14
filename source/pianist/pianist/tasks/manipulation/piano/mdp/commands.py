@@ -210,21 +210,19 @@ class SongKeyPressCommand(KeyPressCommand):
 
         # create tensor buffer for the notes and fingering
         self._key_goal_trajectory = torch.zeros(self.song_num_frames, 88, device=self.device)
-        self._fingering_trajectory = torch.zeros(self.song_num_frames, 5, device=self.device)
-        self._keys_trajectory = []
+        self._active_fingers_trajectory = torch.zeros(self.song_num_frames, 5, device=self.device)
+        self._active_keys_trajectory = torch.zeros(self.song_num_frames, 5, dtype=torch.int32, device=self.device)
 
         for frame_index in range(self.song_num_frames):
             notes = self.trajectory.notes[frame_index]
-            keys = []
             for note in notes:
                 if note.fingering >= 5:
                     # this is left hand, pass for now
                     continue
                 finger_idx = note.fingering
-                keys.append(note.key)
                 self._key_goal_trajectory[frame_index, note.key] = 1.0
-                self._fingering_trajectory[frame_index, finger_idx] = 1.0
-            self._keys_trajectory.append(keys)
+                self._active_fingers_trajectory[frame_index, finger_idx] = 1.0
+                self._active_keys_trajectory[frame_index, finger_idx] = note.key
 
         self._env_steps = torch.zeros(self.num_envs, dtype=torch.int32, device=self.device)
 
@@ -249,15 +247,22 @@ class SongKeyPressCommand(KeyPressCommand):
 
         # reset the key press goals and target key locations
         self._key_press_goals[:] = self._key_goal_trajectory[self._env_steps]
-        self._active_fingers[:] = self._fingering_trajectory[self._env_steps]
-        self._target_key_locations[:] = 0.0
+        self._active_fingers[:] = self._active_fingers_trajectory[self._env_steps]
 
-        # TODO: this is super slow, need to convert NoteTrajectory to tensor
-        for env_id in range(self.num_envs):
-            frame_index = self._env_steps[env_id]
-            keys = self._keys_trajectory[frame_index]
-            target_locations = self.piano.get_key_world_locations(env_id, keys)
-            self._target_key_locations[env_id, :target_locations.shape[0], 0:3] = target_locations
+        # self.piano.get_key_world_locations()
+        key_indices = self._active_keys_trajectory[self._env_steps]
+        env_id_sel = torch.arange(self.num_envs, device=self.device).unsqueeze(1).expand(-1, self.cfg.max_num_fingers)
+        key_locations = self.piano.data.body_pos_w[env_id_sel, self.piano._key_body_indices[key_indices]]
+        key_locations += self.piano._key_contact_offsets[key_indices]
+
+        self._target_key_locations[:] = key_locations * self._active_fingers.unsqueeze(-1)
+
+        # # TODO: this is super slow, need to convert NoteTrajectory to tensor
+        # for env_id in range(self.num_envs):
+        #     frame_index = self._env_steps[env_id]
+        #     keys = self._keys_trajectory[frame_index]
+        #     target_locations = self.piano.get_key_world_locations(env_id, keys)
+        #     self._target_key_locations[env_id, :target_locations.shape[0], 0:3] = target_locations
 
         # for env_id in range(self.num_envs):
         #     frame_index = self._env_steps[env_id]
