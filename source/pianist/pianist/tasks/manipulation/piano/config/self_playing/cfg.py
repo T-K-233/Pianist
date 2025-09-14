@@ -43,7 +43,21 @@ class SelfPlayingPianoSceneCfg(InteractiveSceneCfg):
 ##
 
 @configclass
-class CommandsCfg:
+class SongCommandsCfg:
+    """Command terms for the MDP."""
+
+    keypress = mdp.SongKeyPressCommandCfg(
+        piano_name="piano",
+        robot_name=None,  # no robot in self-playing mode
+        robot_finger_body_names=None,
+        key_close_enough_to_pressed=KEY_CLOSE_ENOUGH_TO_PRESSED,
+        debug_vis=True,
+        midi_file="./source/pianist/data/music/pig_single_finger/nocturne_op9_no_2-1.proto",
+    )
+
+
+@configclass
+class RandomCommandsCfg:
     """Command terms for the MDP."""
 
     keypress = mdp.RandomKeyPressCommandCfg(
@@ -66,6 +80,7 @@ class ObservationsCfg:
 
         # observation terms (order preserved)
         piano_key_goal = ObsTerm(func=mdp.generated_commands, params={"command_name": "keypress"})
+        active_fingers = ObsTerm(func=mdp.active_fingers, params={"command_name": "keypress"})
         piano_key_positions = ObsTerm(func=mdp.piano_key_pos, params={"piano_asset_cfg": SceneEntityCfg("piano")})
 
         def __post_init__(self):
@@ -118,7 +133,7 @@ class RewardsCfg:
     joint_deviation = RewTerm(
         func=mdp.joint_deviation_l1,
         params={"asset_cfg": SceneEntityCfg("piano", joint_names=[".*"])},
-        weight=-1.0,
+        weight=-0.2,
     )
 
 
@@ -147,7 +162,7 @@ class SelfPlayingPianoEnvCfg(ManagerBasedRLEnvCfg):
     scene: SelfPlayingPianoSceneCfg = SelfPlayingPianoSceneCfg(num_envs=1024, env_spacing=2.5)
 
     # Policy commands
-    commands: CommandsCfg = CommandsCfg()
+    commands: SongCommandsCfg = SongCommandsCfg()
 
     # Policy observations
     observations: ObservationsCfg = ObservationsCfg()
@@ -167,26 +182,36 @@ class SelfPlayingPianoEnvCfg(ManagerBasedRLEnvCfg):
     def __post_init__(self):
         """Post initialization."""
         # general settings
-        self.decimation = 2
+        self.decimation = 5
         self.sim.render_interval = self.decimation
-        self.episode_length_s = 12.0
+        self.episode_length_s = 20.0
         self.viewer.eye = (-0.5, 1.0, 1.3)
         self.viewer.lookat = (0.0, 0.0, 0.5)
         # simulation settings
-        self.sim.dt = 1.0 / 60.0
+        self.sim.dt = 0.01
+
+
+@configclass
+class SelfPlayingPianoRandomEnvCfg(SelfPlayingPianoEnvCfg):
+    """Configuration for the piano environment."""
+
+    # Policy commands
+    commands: RandomCommandsCfg = RandomCommandsCfg()
 
 
 @configclass
 class SelfPlayingPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 16
     max_iterations = 20000
-    save_interval = 100
+    save_interval = 200
     experiment_name = "self_playing"
     empirical_normalization = True
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=1.0,
         actor_hidden_dims=[512, 256, 128],
         critic_hidden_dims=[512, 256, 128],
+        # actor_hidden_dims=[256, 128, 128],
+        # critic_hidden_dims=[256, 128, 128],
         activation="elu",
     )
     algorithm = RslRlPpoAlgorithmCfg(

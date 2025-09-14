@@ -9,6 +9,7 @@ from isaaclab.managers import CommandTermCfg, CommandTerm
 from isaaclab.markers import VisualizationMarkersCfg, VisualizationMarkers
 from isaaclab.utils import configclass
 
+from pianist.music.midi_file import MidiFile, NoteTrajectory
 from pianist.assets.piano_articulation import PianoArticulation
 from pianist.assets.piano_constants import NUM_KEYS
 
@@ -22,16 +23,18 @@ FINGERTIP_COLORS = [
     (0.8, 0.8, 0.2),  # Yellow.
 ]
 
+torch.set_printoptions(precision=2)
 
-class RandomKeyPressCommand(CommandTerm):
+
+class KeyPressCommand(CommandTerm):
     """
-    This command generates random key press commands.
+    This command generates key press commands.
     """
 
-    cfg: "RandomKeyPressCommandCfg"
+    cfg: CommandTermCfg
     """Configuration for the command generator."""
 
-    def __init__(self, cfg: "RandomKeyPressCommandCfg", env: ManagerBasedRLEnv):
+    def __init__(self, cfg: CommandTermCfg, env: ManagerBasedRLEnv):
         """Initialize the command generator class.
 
         Args:
@@ -54,13 +57,10 @@ class RandomKeyPressCommand(CommandTerm):
         # discrete command to indicate if the key needs to be pressed
         self._key_press_goals = torch.zeros(self.num_envs, 88, device=self.device)
         # target locations of the keys to be pressed, maximum 10 keys (one for each finger)
-        self._target_key_locations = torch.zeros(self.num_envs, self.cfg.max_num_notes, 3, device=self.device)
+        self._target_key_locations = torch.zeros(self.num_envs, self.cfg.max_num_fingers, 3, device=self.device)
 
-        if self.cfg.robot_name:
-            # active fingers: one-hot vector with 5 elements (thumb, index, middle, ring, pinky)
-            # for now, only index finger (element 1) is active
-            self._active_fingers = torch.zeros(self.num_envs, 5, device=self.device)
-            self._active_fingers[:, 1] = 1.0  # index finger is active
+        # active fingers: one-hot vector with 5 elements (thumb, index, middle, ring, pinky)
+        self._active_fingers = torch.zeros(self.num_envs, 5, device=self.device)
 
         # -- metrics
         if self.cfg.robot_name:
@@ -68,12 +68,6 @@ class RandomKeyPressCommand(CommandTerm):
         self.metrics["correctly_pressed"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["correctly_not_pressed"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["f1"] = torch.zeros(self.num_envs, device=self.device)
-
-    def __str__(self) -> str:
-        msg = "RandomKeyPressCommand:\n"
-        msg += f"\tCommand dimension: {tuple(self.command.shape[1:])}\n"
-        msg += f"\tResampling time range: {self.cfg.resampling_time_range}\n"
-        return msg
 
     """
     Properties
@@ -118,14 +112,20 @@ class RandomKeyPressCommand(CommandTerm):
         if self.cfg.robot_name:
             pos_error = torch.norm(self._target_key_locations - self.fingertip_positions, dim=-1).mean(dim=-1)
 
+        on_keys = self.key_press_goals > 0.5
+        off_keys = self.key_press_goals < 0.5
+
         correctly_pressed_percentage = (
-            (self.key_press_goals > 0.5) * (torch.abs(self.key_press_goals - self.key_press_actual) < key_on_threshold)
-        ).sum(dim=-1).float() / self.key_press_goals.sum(dim=-1)
+            (torch.abs(self.key_press_goals - self.key_press_actual) < key_on_threshold).float() * on_keys.float()
+        ).sum(dim=-1).float() / (on_keys.sum(dim=-1).float() + 1e-6)
         correctly_not_pressed_percentage = (
-            (self.key_press_goals < 0.5) * (torch.abs(self.key_press_goals - self.key_press_actual) < key_on_threshold)
-        ).sum(dim=-1).float() / (NUM_KEYS - self.key_press_goals.sum(dim=-1))
+            (torch.abs(self.key_press_goals - self.key_press_actual) < key_on_threshold).float() * off_keys.float()
+        ).sum(dim=-1).float() / (off_keys.sum(dim=-1).float() + 1e-6)
 
         f1_score = (torch.abs(self.key_press_goals - self.key_press_actual) < key_on_threshold).sum(dim=-1).float() / NUM_KEYS
+
+        # print(correctly_pressed_percentage, correctly_not_pressed_percentage)
+        # print("metrics", self.key_press_goals[0])
 
         if self.cfg.robot_name:
             self.metrics["fingertip_to_key_distance"] = pos_error
@@ -133,43 +133,19 @@ class RandomKeyPressCommand(CommandTerm):
         self.metrics["correctly_not_pressed"] = correctly_not_pressed_percentage
         self.metrics["f1"] = f1_score
 
-    def _resample_command(self, env_ids: Sequence[int]):
-        # sample new pose targets
-        # -- position
-        key_indices = torch.zeros(len(env_ids), self.cfg.max_num_notes, dtype=torch.int32, device=self.device)
-        base = torch.randint(20, 60, (len(env_ids), 1), device=self.device)
-        key_indices[:, :] = base
-        for i in range(1, self.cfg.max_num_notes):
-            offset = torch.randint(1, 5, (len(env_ids), 1), device=self.device)
-            key_indices[:, i:] += offset
-
-        self._key_press_goals[env_ids, :] = 0
-
-        # Convert env_ids to tensor and create proper indexing
-        env_ids_sel = torch.tensor(env_ids, device=self.device).unsqueeze(1).expand(-1, self.cfg.max_num_notes)
-        self._key_press_goals[env_ids_sel, key_indices] = 1
-
-        target_locations = self.piano.get_key_world_locations(env_ids_sel, key_indices)
-        self._target_key_locations[env_ids, :, :] = 0
-        self._target_key_locations[env_ids, :target_locations.shape[1], 0:3] = target_locations
-
-    def _update_command(self):
-        pass
-        # self.piano.write_joint_position_to_sim(self._key_press_goals, self.piano._key_joint_indices)
-
     def _set_debug_vis_impl(self, debug_vis: bool):
         # create markers if necessary for the first time
         if debug_vis:
             if not hasattr(self, "goal_key_visualizer"):
                 # -- goal pose
                 self.goal_key_visualizers = []
-                for i in range(self.cfg.max_num_notes):
+                for i in range(self.cfg.max_num_fingers):
                     cfg = self.cfg.goal_key_visualizer_cfg.copy()
                     cfg.markers["cuboid"].visual_material.diffuse_color = FINGERTIP_COLORS[i]
                     self.goal_key_visualizers.append(VisualizationMarkers(cfg))
                 # -- current body pose
                 self.current_key_visualizers = []
-                for i in range(self.cfg.max_num_notes):
+                for i in range(self.cfg.max_num_fingers):
                     cfg = self.cfg.current_key_visualizer_cfg.copy()
                     cfg.markers["sphere"].visual_material.diffuse_color = FINGERTIP_COLORS[i]
                     self.current_key_visualizers.append(VisualizationMarkers(cfg))
@@ -193,19 +169,210 @@ class RandomKeyPressCommand(CommandTerm):
                 return
             # update the markers
             # -- goal pose
-            for i in range(self.cfg.max_num_notes):
+            for i in range(self.cfg.max_num_fingers):
                 loc = self.target_key_locations[:, i, 0:3]
                 self.goal_key_visualizers[i].visualize(loc)
             # -- current body pose
             finger_quat = self.robot.data.body_quat_w[:, self._finger_body_indices][:, 0]
-            for i in range(self.cfg.max_num_notes):
+            for i in range(self.cfg.max_num_fingers):
                 pos = self.fingertip_positions[:, i]
                 self.current_key_visualizers[i].visualize(pos, finger_quat)
         else:
-            for i in range(self.cfg.max_num_notes):
+            for i in range(self.cfg.max_num_fingers):
                 loc = self.target_key_locations[:, i, 0:3]
                 self.goal_key_visualizers[i].visualize(loc)
                 self.current_key_visualizers[i].visualize(loc)
+
+
+class SongKeyPressCommand(KeyPressCommand):
+    """
+    This command generates random key press commands.
+    """
+
+    cfg: "SongKeyPressCommandCfg"
+    """Configuration for the command generator."""
+
+    def __init__(self, cfg: "SongKeyPressCommandCfg", env: ManagerBasedRLEnv):
+        """Initialize the command generator class.
+
+        Args:
+            cfg: The configuration parameters for the command generator.
+            env: The environment object.
+        """
+        # initialize the base class
+        super().__init__(cfg, env)
+
+        midi = MidiFile.from_file(self.cfg.midi_file)
+        self.trajectory = NoteTrajectory.from_midi(midi, dt=env.step_dt)
+        self.trajectory = self.trajectory.trim_silence()
+
+        self.song_num_frames = len(self.trajectory)
+
+        # create tensor buffer for the notes and fingering
+        self._key_goal_trajectory = torch.zeros(self.song_num_frames, 88, device=self.device)
+        self._fingering_trajectory = torch.zeros(self.song_num_frames, 5, device=self.device)
+        self._keys_trajectory = []
+
+        for frame_index in range(self.song_num_frames):
+            notes = self.trajectory.notes[frame_index]
+            keys = []
+            for note in notes:
+                if note.fingering >= 5:
+                    # this is left hand, pass for now
+                    continue
+                finger_idx = note.fingering
+                keys.append(note.key)
+                self._key_goal_trajectory[frame_index, note.key] = 1.0
+                self._fingering_trajectory[frame_index, finger_idx] = 1.0
+            self._keys_trajectory.append(keys)
+
+        self._env_steps = torch.zeros(self.num_envs, dtype=torch.int32, device=self.device)
+
+    def __str__(self) -> str:
+        msg = "SongKeyPressCommand:\n"
+        msg += f"\tCommand dimension: {tuple(self.command.shape[1:])}\n"
+        msg += f"\tResampling time range: {self.cfg.resampling_time_range}\n"
+        return msg
+
+    def _resample_command(self, env_ids: Sequence[int]):
+        self._env_steps[env_ids] = 0
+
+        self._key_press_goals[env_ids] = 0.0
+        self._active_fingers[env_ids] = 0.0
+        self._target_key_locations[:] = 0.0
+
+    def _update_command(self):
+        self._env_steps[:] += 1
+        # motion time of these environments need to be resampled
+        env_ids = torch.where(self._env_steps >= len(self.trajectory))[0]
+        self._resample_command(env_ids)
+
+        # reset the key press goals and target key locations
+        self._key_press_goals[:] = self._key_goal_trajectory[self._env_steps]
+        self._active_fingers[:] = self._fingering_trajectory[self._env_steps]
+        self._target_key_locations[:] = 0.0
+
+        # TODO: this is super slow, need to convert NoteTrajectory to tensor
+        for env_id in range(self.num_envs):
+            frame_index = self._env_steps[env_id]
+            keys = self._keys_trajectory[frame_index]
+            target_locations = self.piano.get_key_world_locations(env_id, keys)
+            self._target_key_locations[env_id, :target_locations.shape[0], 0:3] = target_locations
+
+        # for env_id in range(self.num_envs):
+        #     frame_index = self._env_steps[env_id]
+        #     for note in notes:
+        #         if note.fingering >= 5:
+        #             # this is left hand, pass for now
+        #             continue
+        #         finger_idx = note.fingering
+        #         self._key_press_goals[env_id, note.key] = 1.0
+        #         target_locations = self.piano.get_key_world_locations(env_id, note.key)
+        #         self._target_key_locations[env_id, finger_idx, 0:3] = target_locations
+        #         if self.cfg.robot_name:
+        #             self._active_fingers[env_id, finger_idx] = 1.0
+
+        # print(self._env_steps[0], len(self.trajectory))
+        # print("update", self.key_press_goals[0])
+
+@configclass
+class SongKeyPressCommandCfg(CommandTermCfg):
+    """Configuration for song key press command generator."""
+
+    class_type: type = SongKeyPressCommand
+
+    resampling_time_range: tuple[float, float] = (1e9, 1e9)
+
+    piano_name: str = MISSING
+    """Name of the piano in the environment for which the commands are generated."""
+
+    robot_name: str = MISSING
+    """Name of the robot in the environment for which the commands are generated."""
+
+    robot_finger_body_names: list[str] = MISSING
+    """Names of the robot finger bodies for which the commands are generated."""
+
+    key_close_enough_to_pressed: float = 0.05
+    """The threshold for the key to be considered pressed."""
+
+    max_num_fingers: int = 5
+    """The maximum number of fingerings possible, should match number of fingers of the robot."""
+
+    midi_file: str = MISSING
+    """The path to the MIDI file."""
+
+    goal_key_visualizer_cfg = VisualizationMarkersCfg(
+        prim_path="/Visuals/Command/goal_pos",
+        markers={
+            "cuboid": sim_utils.CuboidCfg(
+                size=(0.05, 0.02, 0.025),
+                visual_material=sim_utils.PreviewSurfaceCfg(),
+            ),
+        },
+    )
+    """The configuration for the goal pose visualization marker."""
+
+    current_key_visualizer_cfg = VisualizationMarkersCfg(
+        prim_path="/Visuals/Command/body_pos",
+        markers={
+            "sphere": sim_utils.SphereCfg(
+                radius=0.01,
+                visual_material=sim_utils.PreviewSurfaceCfg(),
+            ),
+        },
+    )
+    """The configuration for the current pose visualization marker."""
+
+
+class RandomKeyPressCommand(KeyPressCommand):
+    """
+    This command generates random key press commands.
+    """
+
+    cfg: "RandomKeyPressCommandCfg"
+    """Configuration for the command generator."""
+
+    def __init__(self, cfg: "RandomKeyPressCommandCfg", env: ManagerBasedRLEnv):
+        """Initialize the command generator class.
+
+        Args:
+            cfg: The configuration parameters for the command generator.
+            env: The environment object.
+        """
+        super().__init__(cfg, env)
+
+    def __str__(self) -> str:
+        msg = "RandomKeyPressCommand:\n"
+        msg += f"\tCommand dimension: {tuple(self.command.shape[1:])}\n"
+        msg += f"\tResampling time range: {self.cfg.resampling_time_range}\n"
+        return msg
+
+    def _resample_command(self, env_ids: Sequence[int]):
+        # sample new pose targets
+        # -- position
+        key_indices = torch.zeros(len(env_ids), self.cfg.max_num_fingers, dtype=torch.int32, device=self.device)
+        base = torch.randint(20, 60, (len(env_ids), 1), device=self.device)
+        key_indices[:, :] = base
+        for i in range(1, self.cfg.max_num_fingers):
+            offset = torch.randint(1, 5, (len(env_ids), 1), device=self.device)
+            key_indices[:, i:] += offset
+
+        self._key_press_goals[env_ids, :] = 0.0
+        self._target_key_locations[env_ids, :, :] = 0.0
+
+        # Convert env_ids to tensor and create proper indexing
+        env_ids_sel = torch.tensor(env_ids, device=self.device).unsqueeze(1).expand(-1, self.cfg.max_num_fingers)
+        self._key_press_goals[env_ids_sel, key_indices] = 1.0
+
+        target_locations = self.piano.get_key_world_locations(env_ids_sel, key_indices)
+        self._target_key_locations[env_ids, :target_locations.shape[1], 0:3] = target_locations
+
+        # for now, only index finger (element 1) is active
+        self._active_fingers[:, 1] = 1.0  # index finger is active
+
+    def _update_command(self):
+        pass
+        # self.piano.write_joint_position_to_sim(self._key_press_goals, self.piano._key_joint_indices)
 
 
 @configclass
@@ -226,7 +393,7 @@ class RandomKeyPressCommandCfg(CommandTermCfg):
     key_close_enough_to_pressed: float = 0.05
     """The threshold for the key to be considered pressed."""
 
-    max_num_notes: int = 3
+    max_num_fingers: int = 3
     """The number of notes to generate."""
 
     goal_key_visualizer_cfg = VisualizationMarkersCfg(

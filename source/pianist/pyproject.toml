@@ -14,6 +14,7 @@ dependencies = [
   "isaaclab[isaacsim,all]==2.2.0",
   "mujoco>=3.1.1",
   "mujoco_utils>=0.0.6",
+  "note_seq",
   "dm_control>=1.0.16",
   "mido[ports-rtmidi]",
   "wandb"

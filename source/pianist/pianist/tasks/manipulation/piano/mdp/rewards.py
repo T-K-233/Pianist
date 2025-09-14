@@ -78,21 +78,26 @@ def key_on_reward(
     """
 
     command_term: RandomKeyPressCommand = env.command_manager.get_term(command_name)
-    # get the key indices of nonzero elements in the command
-    on_keys = torch.nonzero(command_term.key_press_goals, as_tuple=True)
 
-    # get the target and actual key press states
-    # need to perform this reshape to convert the 1D indexed result back to (envs, num_on_keys)
-    key_press_goal = command_term.key_press_goals[on_keys].reshape(env.num_envs, -1)
-    key_press_actual = command_term.key_press_actual[on_keys].reshape(env.num_envs, -1)
+    # create a mask for keys that should be pressed (1.0 for keys to press, 0.0 for others)
+    on_keys = command_term.key_press_goals > 0.5
+    # if not on_keys.any():
+    #     return torch.zeros(env.num_envs, device=env.device)
 
-    # if we have pressed the correct keys, reward according to the correct amount
-    on_key_rewards = gaussian_tolerance(
-        key_press_goal - key_press_actual,
+    # compute the error between goal and actual for all keys
+    errors = command_term.key_press_goals - command_term.key_press_actual
+
+    # apply gaussian tolerance to all key errors
+    all_key_rewards = gaussian_tolerance(
+        errors,
         bounds=(0.0, key_close_enough_to_pressed),
         margin=key_close_enough_to_pressed * 10,
     )
-    rewards = on_key_rewards.mean(dim=-1)
+
+    # get the mean reward per environment
+    # only consider rewards for keys that should be pressed
+    rewards = (all_key_rewards * on_keys.float()).sum(dim=-1) / (on_keys.sum(dim=-1).float() + 1e-6)
+
     return rewards
 
 
@@ -103,14 +108,14 @@ def key_off_reward(
 ) -> torch.Tensor:
     """Reward for not pressing the wrong keys."""
     command_term: RandomKeyPressCommand = env.command_manager.get_term(command_name)
-    # get the key indices of nonzero elements in the command
-    off_keys = torch.nonzero(1 - command_term.key_press_goals, as_tuple=True)
 
-    # get the actual key press states
-    # need to perform this reshape to convert the 1D indexed result back to (envs, num_off_keys)
-    key_press_actual = command_term.key_press_actual[off_keys].reshape(env.num_envs, -1)
+    # create a mask for keys that should not be pressed (1.0 for keys to press, 0.0 for others)
+    off_keys = command_term.key_press_goals < 0.5
 
-    # if there are any false positives do not grant any reward
+    # only consider keys that should not be pressed
+    key_press_actual = command_term.key_press_actual * off_keys.float()
+
+    # if there are any false positives, do not grant any reward
     rewards = (1.0 - (key_press_actual > 0.5).any(dim=-1).float())
 
     return rewards
