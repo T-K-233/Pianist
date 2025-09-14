@@ -50,7 +50,7 @@ class KeyPressCommand(CommandTerm):
 
         if self.cfg.robot_name:
             self.robot: Articulation = env.scene[self.cfg.robot_name]
-            finger_body_indices, _ = self.robot.find_bodies(self.cfg.robot_finger_body_names)
+            finger_body_indices, _ = self.robot.find_bodies(self.cfg.robot_finger_body_names, preserve_order=True)
             self._finger_body_indices = torch.tensor(finger_body_indices, device=self.device)
 
         # create buffers

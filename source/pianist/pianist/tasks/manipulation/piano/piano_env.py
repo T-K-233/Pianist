@@ -70,7 +70,8 @@ class CommandsCfg:
     keypress = mdp.RandomKeyPressCommandCfg(
         piano_name="piano",
         robot_name="robot",
-        robot_finger_body_names=["ffdistal"],
+        # robot_finger_body_names=["thdistal", "ffdistal", "mfdistal", "rfdistal", "lfdistal"],
+        robot_finger_body_names=["rfdistal", "mfdistal", "ffdistal"],
         resampling_time_range=(1.0, 4.0),
         key_close_enough_to_pressed=KEY_CLOSE_ENOUGH_TO_PRESSED,
         debug_vis=True,
@@ -124,7 +125,7 @@ class RewardsCfg:
             "command_name": "keypress",
             "key_close_enough_to_pressed": KEY_CLOSE_ENOUGH_TO_PRESSED,
         },
-        weight=1.0,
+        weight=4.0,
     )
     key_off = RewTerm(
         func=mdp.key_off_reward,
@@ -146,7 +147,7 @@ class RewardsCfg:
             "asset_cfg": SceneEntityCfg("robot"),
             "finger_close_enough_to_key": FINGER_CLOSE_ENOUGH_TO_KEY,
         },
-        weight=1.0,
+        weight=0.5,
     )
     # sustain_pedal = RewTerm(
     #     func=mdp.sustain_pedal_reward,
