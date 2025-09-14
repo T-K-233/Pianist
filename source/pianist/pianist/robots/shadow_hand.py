@@ -50,13 +50,13 @@ SHADOW_HAND_CFG = ArticulationCfg(
                 "THJ(3|2)": 0.99,
             },
             stiffness={
-                "WRJ(X|Y)": 300.0,
+                "WRJ(X|Y)": 80.0,
                 "WRJ(2|1)": 5.0,
                 "(LF|TH)J5": 1.0,
                 "(FF|MF|RF|LF|TH)J(4|3|2)": 1.0,
             },
             damping={
-                "WRJ(X|Y)": 100.0,
+                "WRJ(X|Y)": 40.0,
                 "WRJ(2|1)": 0.5,
                 "(LF|TH)J5": 0.1,
                 "(FF|MF|RF|LF|TH)J(4|3|2)": 0.1,

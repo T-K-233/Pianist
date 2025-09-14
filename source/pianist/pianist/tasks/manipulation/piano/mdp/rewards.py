@@ -157,9 +157,9 @@ def fingertip_to_key_distances(env: ManagerBasedRLEnv, command_name: str, asset_
 def fingertip_to_key_distance_l2(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg) -> torch.Tensor:
     """Compute the L2 distance between the fingertip and the key."""
     command_term: RandomKeyPressCommand = env.command_manager.get_term(command_name)
-    distances = fingertip_to_key_distances(env, command_name, asset_cfg)
-    distances = command_term.active_fingers * distances
-    return torch.sum(distances, dim=-1)
+    all_distances = fingertip_to_key_distances(env, command_name, asset_cfg)
+    distances = torch.sum(command_term.active_fingers * all_distances, dim=-1) / (command_term.active_fingers.sum(dim=-1).float() + 1e-6)
+    return distances
 
 
 def fingertip_to_key_distance_reward(
@@ -173,10 +173,10 @@ def fingertip_to_key_distance_reward(
 
     distances = fingertip_to_key_distances(env, command_name, asset_cfg)
     distance_rewards = gaussian_tolerance(
-        distances.flatten(start_dim=1),
+        distances,
         bounds=(0, finger_close_enough_to_key),
         margin=(finger_close_enough_to_key * 10),
     )
-    rewards = (command_term.active_fingers * distance_rewards).sum(dim=-1)
+    rewards = (command_term.active_fingers * distance_rewards).sum(dim=-1) / (command_term.active_fingers.sum(dim=-1).float() + 1e-6)
 
     return rewards

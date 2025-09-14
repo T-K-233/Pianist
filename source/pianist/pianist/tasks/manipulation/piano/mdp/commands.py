@@ -74,10 +74,6 @@ class KeyPressCommand(CommandTerm):
 
     @property
     def command(self) -> torch.Tensor:
-        """The desired pose command. Shape is (num_envs, 7).
-
-        The first three elements correspond to the position, followed by the quaternion orientation in (w, x, y, z).
-        """
         return self.key_press_goals
 
     @property
@@ -109,7 +105,10 @@ class KeyPressCommand(CommandTerm):
         key_on_threshold = self.cfg.key_close_enough_to_pressed
 
         if self.cfg.robot_name:
-            pos_error = (self.active_fingers * torch.norm((self._target_key_locations - self.fingertip_positions), dim=-1)).sum(dim=-1)
+            pos_error = (
+                (self.active_fingers * torch.norm((self._target_key_locations - self.fingertip_positions), dim=-1)).sum(dim=-1)
+                / (self.active_fingers.sum(dim=-1).float() + 1e-6)
+            )
 
         on_keys = self.key_press_goals > 0.5
         off_keys = self.key_press_goals < 0.5
@@ -125,7 +124,6 @@ class KeyPressCommand(CommandTerm):
 
         # print(correctly_pressed_percentage, correctly_not_pressed_percentage)
         # print("metrics", self.key_press_goals[0])
-
         if self.cfg.robot_name:
             self.metrics["fingertip_to_key_distance"] = pos_error
         self.metrics["correctly_pressed"] = correctly_pressed_percentage
@@ -202,7 +200,7 @@ class SongKeyPressCommand(KeyPressCommand):
         super().__init__(cfg, env)
 
         midi = MidiFile.from_file(self.cfg.midi_file)
-        self.trajectory = NoteTrajectory.from_midi(midi, dt=env.step_dt)
+        self.trajectory = NoteTrajectory.from_midi(midi, dt=env.step_dt / 4)  # HACK: slow down the tempo
         self.trajectory = self.trajectory.trim_silence()
 
         self.song_num_frames = len(self.trajectory)
@@ -298,9 +296,6 @@ class SongKeyPressCommandCfg(CommandTermCfg):
 
     key_close_enough_to_pressed: float = 0.05
     """The threshold for the key to be considered pressed."""
-
-    max_num_fingers: int = 5
-    """The maximum number of fingerings possible, should match number of fingers of the robot."""
 
     midi_file: str = MISSING
     """The path to the MIDI file."""
