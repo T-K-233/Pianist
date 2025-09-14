@@ -125,7 +125,7 @@ class RewardsCfg:
             "command_name": "keypress",
             "key_close_enough_to_pressed": KEY_CLOSE_ENOUGH_TO_PRESSED,
         },
-        weight=4.0,
+        weight=2.0,
     )
     key_off = RewTerm(
         func=mdp.key_off_reward,
@@ -207,10 +207,10 @@ class PianoEnvCfg(ManagerBasedRLEnvCfg):
     def __post_init__(self):
         """Post initialization."""
         # general settings
-        self.decimation = 2
+        self.decimation = 5
         self.sim.render_interval = self.decimation
         self.episode_length_s = 12.0
         self.viewer.eye = (-0.5, 1.0, 1.3)
         self.viewer.lookat = (0.0, 0.0, 0.5)
         # simulation settings
-        self.sim.dt = 1.0 / 60.0
+        self.sim.dt = 0.01
