@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from dataclasses import MISSING
 
 import torch
@@ -57,7 +56,7 @@ class KeyPressCommand(CommandTerm):
         # discrete command to indicate if the key needs to be pressed
         self._key_press_goals = torch.zeros(self.num_envs, 88, device=self.device)
         # target locations of the keys to be pressed, maximum 10 keys (one for each finger)
-        self._target_key_locations = torch.zeros(self.num_envs, self.cfg.max_num_fingers, 3, device=self.device)
+        self._target_key_locations = torch.zeros(self.num_envs, 5, 3, device=self.device)
 
         # active fingers: one-hot vector with 5 elements (thumb, index, middle, ring, pinky)
         self._active_fingers = torch.zeros(self.num_envs, 5, device=self.device)
@@ -110,7 +109,7 @@ class KeyPressCommand(CommandTerm):
         key_on_threshold = self.cfg.key_close_enough_to_pressed
 
         if self.cfg.robot_name:
-            pos_error = torch.norm(self._target_key_locations - self.fingertip_positions, dim=-1).mean(dim=-1)
+            pos_error = (self.active_fingers * torch.norm((self._target_key_locations - self.fingertip_positions), dim=-1)).sum(dim=-1)
 
         on_keys = self.key_press_goals > 0.5
         off_keys = self.key_press_goals < 0.5
@@ -139,13 +138,13 @@ class KeyPressCommand(CommandTerm):
             if not hasattr(self, "goal_key_visualizer"):
                 # -- goal pose
                 self.goal_key_visualizers = []
-                for i in range(self.cfg.max_num_fingers):
+                for i in range(5):
                     cfg = self.cfg.goal_key_visualizer_cfg.copy()
                     cfg.markers["cuboid"].visual_material.diffuse_color = FINGERTIP_COLORS[i]
                     self.goal_key_visualizers.append(VisualizationMarkers(cfg))
                 # -- current body pose
                 self.current_key_visualizers = []
-                for i in range(self.cfg.max_num_fingers):
+                for i in range(5):
                     cfg = self.cfg.current_key_visualizer_cfg.copy()
                     cfg.markers["sphere"].visual_material.diffuse_color = FINGERTIP_COLORS[i]
                     self.current_key_visualizers.append(VisualizationMarkers(cfg))
@@ -169,16 +168,16 @@ class KeyPressCommand(CommandTerm):
                 return
             # update the markers
             # -- goal pose
-            for i in range(self.cfg.max_num_fingers):
+            for i in range(5):
                 loc = self.target_key_locations[:, i, 0:3]
                 self.goal_key_visualizers[i].visualize(loc)
             # -- current body pose
             finger_quat = self.robot.data.body_quat_w[:, self._finger_body_indices][:, 0]
-            for i in range(self.cfg.max_num_fingers):
+            for i in range(5):
                 pos = self.fingertip_positions[:, i]
                 self.current_key_visualizers[i].visualize(pos, finger_quat)
         else:
-            for i in range(self.cfg.max_num_fingers):
+            for i in range(5):
                 loc = self.target_key_locations[:, i, 0:3]
                 self.goal_key_visualizers[i].visualize(loc)
                 self.current_key_visualizers[i].visualize(loc)
@@ -232,7 +231,7 @@ class SongKeyPressCommand(KeyPressCommand):
         msg += f"\tResampling time range: {self.cfg.resampling_time_range}\n"
         return msg
 
-    def _resample_command(self, env_ids: Sequence[int]):
+    def _resample_command(self, env_ids: torch.Tensor):
         self._env_steps[env_ids] = 0
 
         self._key_press_goals[env_ids] = 0.0
@@ -251,7 +250,7 @@ class SongKeyPressCommand(KeyPressCommand):
 
         # self.piano.get_key_world_locations()
         key_indices = self._active_keys_trajectory[self._env_steps]
-        env_id_sel = torch.arange(self.num_envs, device=self.device).unsqueeze(1).expand(-1, self.cfg.max_num_fingers)
+        env_id_sel = torch.arange(self.num_envs, device=self.device).unsqueeze(1).expand(-1, 5)
         key_locations = self.piano.data.body_pos_w[env_id_sel, self.piano._key_body_indices[key_indices]]
         key_locations += self.piano._key_contact_offsets[key_indices]
 
@@ -352,28 +351,30 @@ class RandomKeyPressCommand(KeyPressCommand):
         msg += f"\tResampling time range: {self.cfg.resampling_time_range}\n"
         return msg
 
-    def _resample_command(self, env_ids: Sequence[int]):
+    def _resample_command(self, env_ids: torch.Tensor):
         # sample new pose targets
         # -- position
-        key_indices = torch.zeros(len(env_ids), self.cfg.max_num_fingers, dtype=torch.int32, device=self.device)
-        base = torch.randint(20, 60, (len(env_ids), 1), device=self.device)
+        key_indices = torch.zeros(env_ids.shape[0], self.cfg.num_notes, dtype=torch.int32, device=self.device)
+        base = torch.randint(20, 60, (env_ids.shape[0], 1), device=self.device)
         key_indices[:, :] = base
-        for i in range(1, self.cfg.max_num_fingers):
-            offset = torch.randint(1, 5, (len(env_ids), 1), device=self.device)
+        for i in range(1, self.cfg.num_notes):
+            offset = torch.randint(1, 5, (env_ids.shape[0], 1), device=self.device)
             key_indices[:, i:] += offset
 
         self._key_press_goals[env_ids, :] = 0.0
         self._target_key_locations[env_ids, :, :] = 0.0
+        self._active_fingers[:, :] = 0.0
 
         # Convert env_ids to tensor and create proper indexing
-        env_ids_sel = torch.tensor(env_ids, device=self.device).unsqueeze(1).expand(-1, self.cfg.max_num_fingers)
+        env_ids_sel = env_ids.unsqueeze(1).expand(-1, self.cfg.num_notes)
         self._key_press_goals[env_ids_sel, key_indices] = 1.0
 
         target_locations = self.piano.get_key_world_locations(env_ids_sel, key_indices)
-        self._target_key_locations[env_ids, :target_locations.shape[1], 0:3] = target_locations
 
         # for now, only index finger (element 1) is active
-        self._active_fingers[:, 1] = 1.0  # index finger is active
+        # num notes must be less than 5, we are not using thumb
+        self._target_key_locations[env_ids, 1:target_locations.shape[1] + 1, 0:3] = target_locations
+        self._active_fingers[:, 1:target_locations.shape[1] + 1] = 1.0  # index finger is active
 
     def _update_command(self):
         pass
@@ -398,7 +399,7 @@ class RandomKeyPressCommandCfg(CommandTermCfg):
     key_close_enough_to_pressed: float = 0.05
     """The threshold for the key to be considered pressed."""
 
-    max_num_fingers: int = 3
+    num_notes: int = 3
     """The number of notes to generate."""
 
     goal_key_visualizer_cfg = VisualizationMarkersCfg(

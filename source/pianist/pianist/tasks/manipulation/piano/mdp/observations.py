@@ -29,3 +29,11 @@ def piano_key_pos(env: ManagerBasedEnv, piano_asset_cfg: SceneEntityCfg = SceneE
     # extract the used quantities (to enable type-hinting)
     asset: PianoArticulation = env.scene[piano_asset_cfg.name]
     return asset.key_press_states
+
+
+def distance_to_key(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    """The distance between the fingertip and the key."""
+    command_term = env.command_manager.get_term(command_name)
+    error = torch.norm(command_term._target_key_locations - command_term.fingertip_positions, dim=-1)
+    # error = command_term._target_key_locations - command_term.fingertip_positions
+    return error.flatten(start_dim=1)

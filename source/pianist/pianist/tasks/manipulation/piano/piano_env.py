@@ -76,8 +76,8 @@ class CommandsCfg:
     keypress = mdp.RandomKeyPressCommandCfg(
         piano_name="piano",
         robot_name="robot",
-        # robot_finger_body_names=["thdistal", "ffdistal", "mfdistal", "rfdistal", "lfdistal"],
-        robot_finger_body_names=["rfdistal", "mfdistal", "ffdistal"],
+        robot_finger_body_names=["thtip", "fftip", "mftip", "rftip", "lftip"],
+        num_notes=1,
         resampling_time_range=(1.0, 4.0),
         key_close_enough_to_pressed=KEY_CLOSE_ENOUGH_TO_PRESSED,
         debug_vis=True,
@@ -94,17 +94,29 @@ class ObservationsCfg:
 
         # observation terms (order preserved)
         piano_key_goal = ObsTerm(func=mdp.generated_commands, params={"command_name": "keypress"})
-        forearm_pos = ObsTerm(func=mdp.forearm_pos, params={"robot_asset_cfg": SceneEntityCfg("robot")})
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
         active_fingers = ObsTerm(func=mdp.active_fingers, params={"command_name": "keypress"})
+        forearm_pos = ObsTerm(func=mdp.forearm_pos, params={"robot_asset_cfg": SceneEntityCfg("robot")})
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel)  #, noise=Unoise(n_min=-0.01, n_max=0.01))
+        joint_vel = ObsTerm(func=mdp.joint_vel, params={"asset_cfg": SceneEntityCfg("robot")})
         piano_key_positions = ObsTerm(func=mdp.piano_key_pos, params={"piano_asset_cfg": SceneEntityCfg("piano")})
         actions = ObsTerm(func=mdp.last_action)
 
         def __post_init__(self):
             self.enable_corruption = True
 
+    @configclass
+    class CriticCfg(PolicyCfg):
+        """Observations for critic group."""
+
+        # observation terms (order preserved)
+        distance_to_key = ObsTerm(func=mdp.distance_to_key, params={"command_name": "keypress"})
+
+        def __post_init__(self):
+            self.enable_corruption = False
+
     # observation groups
     policy: PolicyCfg = PolicyCfg()
+    critic: CriticCfg = CriticCfg()
 
 
 @configclass
@@ -114,7 +126,7 @@ class ActionsCfg:
     joint_pos = mdp.JointPositionActionCfg(
         asset_name="robot",
         joint_names=[".*"],
-        scale=1.0,
+        scale=0.25,
         preserve_order=True,
         use_default_offset=True,
     )
@@ -139,7 +151,7 @@ class RewardsCfg:
             "command_name": "keypress",
             "key_close_enough_to_pressed": KEY_CLOSE_ENOUGH_TO_PRESSED,
         },
-        weight=4.0,
+        weight=0.2,
     )
     energy = RewTerm(
         func=mdp.energy_reward,
@@ -153,7 +165,7 @@ class RewardsCfg:
             "asset_cfg": SceneEntityCfg("robot"),
             "finger_close_enough_to_key": FINGER_CLOSE_ENOUGH_TO_KEY,
         },
-        weight=0.5,
+        weight=1.0,
     )
     # sustain_pedal = RewTerm(
     #     func=mdp.sustain_pedal_reward,
@@ -173,7 +185,7 @@ class RewardsCfg:
                 ],
             )
         },
-        weight=-0.1,
+        weight=-0.5,
     )
     undesired_contacts = RewTerm(
         func=mdp.undesired_contacts,

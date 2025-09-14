@@ -8,7 +8,7 @@ from isaaclab.assets.articulation import ArticulationCfg
 
 SHADOW_HAND_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path="./source/pianist/data/robots/shadow_hand/usd/left_hand_translation.usd",
+        usd_path="./source/pianist/data/robots/shadow_hand/usd/right_hand_translation.usd",
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=True,
