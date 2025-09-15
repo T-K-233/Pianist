@@ -79,6 +79,7 @@ class SongSequence:
             active_fingers contains boolean masks of fingers among the total 5 fingers that are active (pressing a key)
             fingerings contains the fingerings (which finger should press which key)
         """
+        frame_indices = frame_indices.clamp(0, self.num_frames - 1)
         return (
             self._active_keys[frame_indices],
             self._active_fingers[frame_indices],

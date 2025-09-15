@@ -43,7 +43,9 @@ class KeyPressCommand(CommandTerm):
         super().__init__(cfg, env)
 
         if self.cfg.song_name.endswith(".proto"):
-            self.song = SongSequence.from_midi(self.cfg.song_name, dt=env.step_dt, device=self.device)
+            # HACK: slow down the tempo
+            self.song = SongSequence.from_midi(self.cfg.song_name, dt=env.step_dt/2, device=self.device)
+            # self.song = SongSequence.from_midi(self.cfg.song_name, dt=env.step_dt, device=self.device)
         elif self.cfg.song_name == "simple":
             self.song = SongSequence.from_simple(num_frames=40, dt=env.step_dt, device=self.device)
         elif self.cfg.song_name == "random":
@@ -64,11 +66,15 @@ class KeyPressCommand(CommandTerm):
 
         # create buffers
         # discrete command to indicate if the key needs to be pressed
+        self.num_steps_lookahead = 10
         self._key_goal_states = torch.zeros(self.num_envs, 88, dtype=torch.bool, device=self.device)
         # discrete vector with 5 elements (thumb, index, middle, ring, pinky)
         self._active_fingers = torch.zeros(self.num_envs, 5, dtype=torch.bool, device=self.device)
         # target locations of the keys to be pressed, maximum 10 keys (one for each finger)
         self._key_goal_locations = torch.zeros(self.num_envs, 5, 3, device=self.device)
+
+        self._key_goal_states_lookahead = torch.zeros(self.num_envs, self.num_steps_lookahead, 88, dtype=torch.bool, device=self.device)
+        self._active_fingers_lookahead = torch.zeros(self.num_envs, self.num_steps_lookahead, 5, dtype=torch.bool, device=self.device)
 
         # step counter for the song
         self._song_steps = torch.zeros(self.num_envs, dtype=torch.int32, device=self.device)
@@ -92,7 +98,8 @@ class KeyPressCommand(CommandTerm):
 
     @property
     def command(self) -> torch.Tensor:
-        return self.key_goal_states.float()
+        # return self.key_goal_states.float()
+        return self.key_goal_states_lookahead.flatten(start_dim=1).float()
 
     @property
     def key_goal_states(self) -> torch.Tensor:
@@ -114,12 +121,22 @@ class KeyPressCommand(CommandTerm):
     def active_fingers(self) -> torch.Tensor:
         return self._active_fingers
 
+    @property
+    def key_goal_states_lookahead(self) -> torch.Tensor:
+        return self._key_goal_states_lookahead
+
+    @property
+    def active_fingers_lookahead(self) -> torch.Tensor:
+        return self._active_fingers_lookahead
+
     def _resample_command(self, env_ids: torch.Tensor):
         self._song_steps[env_ids] = 0
 
         self._key_goal_states[env_ids] = 0
         self._active_fingers[env_ids] = 0
         self._key_goal_locations[env_ids] = 0.0
+        self._key_goal_states_lookahead[env_ids] = 0
+        self._active_fingers_lookahead[env_ids] = 0
 
     def _update_command(self):
         self._song_steps[:] += 1
@@ -130,6 +147,11 @@ class KeyPressCommand(CommandTerm):
         active_keys, active_fingers, fingerings = self.song.get_frames(self._song_steps)
         self._key_goal_states[:] = active_keys
         self._active_fingers[:] = active_fingers
+
+        lookahead_steps = self._song_steps.unsqueeze(1) + torch.arange(self.num_steps_lookahead, device=self.device)
+        active_keys_lookahead, active_fingers_lookahead, _ = self.song.get_frames(lookahead_steps)
+        self._key_goal_states_lookahead[:] = active_keys_lookahead
+        self._active_fingers_lookahead[:] = active_fingers_lookahead
 
         # self._key_goal_locations[:] = self.piano.get_key_world_locations(env_ids, keys_indices)
         # create a selection tensor for environment ids to get all the key locations
@@ -176,6 +198,8 @@ class KeyPressCommand(CommandTerm):
         correctly_not_pressed_percentage = correctly_not_pressed_count.float() / (num_off_keys.float() + 1e-6)
 
         f1_score = (correctly_pressed_count + correctly_not_pressed_count).float() / ((num_on_keys + num_off_keys).float() + 1e-6)
+
+        # print(distance_error, correctly_pressed_count)
 
         if self.cfg.robot_name:
             self.metrics["fingertip_to_key_distance"] = distance_error

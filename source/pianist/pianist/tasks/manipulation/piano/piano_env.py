@@ -74,23 +74,14 @@ class CommandsCfg:
     """Command terms for the MDP."""
 
     keypress = mdp.KeyPressCommandCfg(
-        song_name="simple",
-        # song_name="./source/pianist/data/music/pig_single_finger/nocturne_op9_no_2-1.proto",
+        # song_name="simple",
+        song_name="./source/pianist/data/music/pig_single_finger/nocturne_op9_no_2-1.proto",
         piano_name="piano",
         robot_name="robot",
         robot_finger_body_names=["thtip", "fftip", "mftip", "rftip", "lftip"],
         key_close_enough_to_pressed=KEY_CLOSE_ENOUGH_TO_PRESSED,
         debug_vis=True,
     )
-
-    # keypress = mdp.SongKeyPressCommandCfg(
-    #     piano_name="piano",
-    #     robot_name="robot",
-    #     robot_finger_body_names=["thtip", "fftip", "mftip", "rftip", "lftip"],
-    #     key_close_enough_to_pressed=KEY_CLOSE_ENOUGH_TO_PRESSED,
-    #     debug_vis=True,
-    #     midi_file="./source/pianist/data/music/pig_single_finger/nocturne_op9_no_2-1.proto",
-    # )
 
 
 @configclass
@@ -103,9 +94,9 @@ class ObservationsCfg:
 
         # observation terms (order preserved)
         piano_key_goal = ObsTerm(func=mdp.generated_commands, params={"command_name": "keypress"})
-        active_fingers = ObsTerm(func=mdp.active_fingers, params={"command_name": "keypress"})
+        active_fingers = ObsTerm(func=mdp.active_fingers_lookahead, params={"command_name": "keypress"})
         forearm_pos = ObsTerm(func=mdp.forearm_pos, params={"robot_asset_cfg": SceneEntityCfg("robot")})
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel)  #, noise=Unoise(n_min=-0.01, n_max=0.01))
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
         joint_vel = ObsTerm(func=mdp.joint_vel, params={"asset_cfg": SceneEntityCfg("robot")})
         piano_key_positions = ObsTerm(func=mdp.piano_key_pos, params={"piano_asset_cfg": SceneEntityCfg("piano")})
         actions = ObsTerm(func=mdp.last_action)
@@ -264,7 +255,7 @@ class PianoEnvCfg(ManagerBasedRLEnvCfg):
         # general settings
         self.decimation = 5
         self.sim.render_interval = self.decimation
-        self.episode_length_s = 12.0
+        self.episode_length_s = 40.0
         self.viewer.eye = (-0.5, 1.0, 1.3)
         self.viewer.lookat = (0.0, 0.0, 0.5)
         # simulation settings
