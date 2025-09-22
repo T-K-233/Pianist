@@ -187,6 +187,19 @@ class RewardsCfg:
         },
         weight=-0.5,
     )
+    joint_deviation_fingers = RewTerm(
+        func=mdp.joint_deviation_l1,
+        params={
+            "asset_cfg": SceneEntityCfg(
+                "robot",
+                joint_names=[
+                    "(LF|TH)J5",
+                    "(FF|MF|RF|LF|TH)J(4|3|2|1)",
+                ],
+            )
+        },
+        weight=-0.01,
+    )
     undesired_contacts = RewTerm(
         func=mdp.undesired_contacts,
         params={
