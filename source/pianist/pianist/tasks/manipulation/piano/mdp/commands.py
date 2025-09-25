@@ -78,8 +78,14 @@ class KeyPressCommand(CommandTerm):
         # -- metrics
         if self.cfg.robot_name:
             self.metrics["fingertip_to_key_distance"] = torch.zeros(self.num_envs, device=self.device)
+
+        # true positive rate (also known as recall) = TP / P
         self.metrics["correctly_pressed"] = torch.zeros(self.num_envs, device=self.device)
+        # true negative rate = TN / N
         self.metrics["correctly_not_pressed"] = torch.zeros(self.num_envs, device=self.device)
+        # precision = TP / (TP + FP)
+        self.metrics["precision"] = torch.zeros(self.num_envs, device=self.device)
+        # f1 score = 2 * TP / (2 * TP + FP + FN)
         self.metrics["f1"] = torch.zeros(self.num_envs, device=self.device)
 
     def __str__(self) -> str:
@@ -187,19 +193,22 @@ class KeyPressCommand(CommandTerm):
         correctly_pressed_count = (pressed_keys * on_keys).sum(dim=-1)
         correctly_not_pressed_count = (not_pressed_keys * off_keys).sum(dim=-1)
 
-        correctly_pressed_percentage = correctly_pressed_count.float() / (num_on_keys.float() + 1e-6)
-        correctly_not_pressed_percentage = correctly_not_pressed_count.float() / (num_off_keys.float() + 1e-6)
+        true_positive_rate = correctly_pressed_count.float() / (num_on_keys.float() + 1e-6)
+        true_negative_rate = correctly_not_pressed_count.float() / (num_off_keys.float() + 1e-6)
+
+        precision = correctly_pressed_count.float() / (pressed_keys.sum(dim=-1).float() + 1e-6)
+        recall = true_positive_rate
+        f1_score = 2 * precision * recall / (precision + recall + 1e-6)
 
         # if there are no keys intended to be pressed, assign all correct to that environment
-        correctly_pressed_percentage[num_on_keys == 0] = 1.0
-        correctly_not_pressed_percentage[num_off_keys == 0] = 1.0
-
-        f1_score = (correctly_pressed_count + correctly_not_pressed_count).float() / ((num_on_keys + num_off_keys).float() + 1e-6)
+        true_positive_rate[num_on_keys == 0] = 1.0
+        true_negative_rate[num_off_keys == 0] = 1.0
 
         if self.cfg.robot_name:
             self.metrics["fingertip_to_key_distance"] = distance_error
-        self.metrics["correctly_pressed"] = correctly_pressed_percentage
-        self.metrics["correctly_not_pressed"] = correctly_not_pressed_percentage
+        self.metrics["correctly_pressed"] = true_positive_rate
+        self.metrics["correctly_not_pressed"] = true_negative_rate
+        self.metrics["precision"] = precision
         self.metrics["f1"] = f1_score
 
     def _set_debug_vis_impl(self, debug_vis: bool):
