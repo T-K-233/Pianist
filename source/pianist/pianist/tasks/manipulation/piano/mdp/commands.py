@@ -44,7 +44,7 @@ class KeyPressCommand(CommandTerm):
 
         if self.cfg.song_name.endswith(".proto"):
             # HACK: slow down the tempo
-            self.song = SongSequence.from_midi(self.cfg.song_name, dt=env.step_dt/2, device=self.device)
+            self.song = SongSequence.from_midi(self.cfg.song_name, dt=env.step_dt * self.cfg.slow_down_factor, device=self.device)
             # self.song = SongSequence.from_midi(self.cfg.song_name, dt=env.step_dt, device=self.device)
         elif self.cfg.song_name == "simple":
             self.song = SongSequence.from_simple(num_frames=40, dt=env.step_dt, device=self.device)
@@ -66,15 +66,13 @@ class KeyPressCommand(CommandTerm):
 
         # create buffers
         # discrete command to indicate if the key needs to be pressed
-        self.num_steps_lookahead = 10
-        self._key_goal_states = torch.zeros(self.num_envs, 88, dtype=torch.bool, device=self.device)
+        # self._key_goal_states = torch.zeros(self.num_envs, 88, dtype=torch.bool, device=self.device)
+        self._key_goal_states_lookahead = torch.zeros(self.num_envs, self.cfg.lookahead_steps, 88, dtype=torch.bool, device=self.device)
         # discrete vector with 5 elements (thumb, index, middle, ring, pinky)
-        self._active_fingers = torch.zeros(self.num_envs, 5, dtype=torch.bool, device=self.device)
+        # self._active_fingers = torch.zeros(self.num_envs, 5, dtype=torch.bool, device=self.device)
+        self._active_fingers_lookahead = torch.zeros(self.num_envs, self.cfg.lookahead_steps, 5, dtype=torch.bool, device=self.device)
         # target locations of the keys to be pressed, maximum 10 keys (one for each finger)
         self._key_goal_locations = torch.zeros(self.num_envs, 5, 3, device=self.device)
-
-        self._key_goal_states_lookahead = torch.zeros(self.num_envs, self.num_steps_lookahead, 88, dtype=torch.bool, device=self.device)
-        self._active_fingers_lookahead = torch.zeros(self.num_envs, self.num_steps_lookahead, 5, dtype=torch.bool, device=self.device)
 
         # step counter for the song
         self._song_steps = torch.zeros(self.num_envs, dtype=torch.int32, device=self.device)
@@ -103,7 +101,7 @@ class KeyPressCommand(CommandTerm):
 
     @property
     def key_goal_states(self) -> torch.Tensor:
-        return self._key_goal_states
+        return self._key_goal_states_lookahead[:, 0]
 
     @property
     def key_actual_states(self) -> torch.Tensor:
@@ -119,7 +117,7 @@ class KeyPressCommand(CommandTerm):
 
     @property
     def active_fingers(self) -> torch.Tensor:
-        return self._active_fingers
+        return self._active_fingers_lookahead[:, 0]
 
     @property
     def key_goal_states_lookahead(self) -> torch.Tensor:
@@ -132,40 +130,38 @@ class KeyPressCommand(CommandTerm):
     def _resample_command(self, env_ids: torch.Tensor):
         self._song_steps[env_ids] = 0
 
-        self._key_goal_states[env_ids] = 0
-        self._active_fingers[env_ids] = 0
-        self._key_goal_locations[env_ids] = 0.0
+        # self._key_goal_states[env_ids] = 0
+        # self._active_fingers[env_ids] = 0
         self._key_goal_states_lookahead[env_ids] = 0
         self._active_fingers_lookahead[env_ids] = 0
+        self._key_goal_locations[env_ids] = 0.0
 
     def _update_command(self):
         self._song_steps[:] += 1
         env_ids = torch.where(self._song_steps >= self.song.num_frames)[0]
         self._resample_command(env_ids)
 
-        # each of these tensors are (num_envs, dim)
-        active_keys, active_fingers, fingerings = self.song.get_frames(self._song_steps)
-        self._key_goal_states[:] = active_keys
-        self._active_fingers[:] = active_fingers
-
-        lookahead_steps = self._song_steps.unsqueeze(1) + torch.arange(self.num_steps_lookahead, device=self.device)
-        active_keys_lookahead, active_fingers_lookahead, _ = self.song.get_frames(lookahead_steps)
+        lookahead_steps = self._song_steps.unsqueeze(1) + torch.arange(self.cfg.lookahead_steps, device=self.device)
+        active_keys_lookahead, active_fingers_lookahead, fingerings_lookahead = self.song.get_frames(lookahead_steps)
         self._key_goal_states_lookahead[:] = active_keys_lookahead
         self._active_fingers_lookahead[:] = active_fingers_lookahead
+
+        fingerings_current = fingerings_lookahead[:, 0]
+        active_fingers_current = active_fingers_lookahead[:, 0]
 
         # self._key_goal_locations[:] = self.piano.get_key_world_locations(env_ids, keys_indices)
         # create a selection tensor for environment ids to get all the key locations
         env_id_sel = torch.arange(self.num_envs, device=self.device).unsqueeze(1).expand(
-            self.num_envs, active_fingers.shape[1]
+            self.num_envs, active_fingers_current.shape[-1]
         )
 
-        key_locations = self.piano.data.body_pos_w[env_id_sel, self.piano._key_body_indices[fingerings]]
+        key_locations = self.piano.data.body_pos_w[env_id_sel, self.piano._key_body_indices[fingerings_current]]
 
         # add the offset from the key rotate joints as the desired contact location
-        key_locations += self.piano._key_contact_offsets[fingerings]
+        key_locations += self.piano._key_contact_offsets[fingerings_current]
 
         # mask the key locations with the active fingers
-        self._key_goal_locations[:] = key_locations * active_fingers.unsqueeze(-1)
+        self._key_goal_locations[:] = key_locations * active_fingers_current.unsqueeze(-1)
 
     def _update_metrics(self):
         # compute the error
@@ -182,8 +178,8 @@ class KeyPressCommand(CommandTerm):
             distance_error = effective_distances.sum(dim=-1) / (num_active_fingers + 1e-6)
 
         # get the number of keys intended to be pressed and not pressed
-        on_keys = self._key_goal_states
-        off_keys = ~self._key_goal_states
+        on_keys = self.key_goal_states
+        off_keys = ~self.key_goal_states
         num_on_keys = on_keys.sum(dim=-1)
         num_off_keys = off_keys.sum(dim=-1)
 
@@ -278,8 +274,14 @@ class KeyPressCommandCfg(CommandTermCfg):
     robot_finger_body_names: list[str] = MISSING
     """Names of the robot finger bodies for which the commands are generated."""
 
+    slow_down_factor: float = 1.0
+    """The factor to slow down the tempo of the song."""
+
     key_close_enough_to_pressed: float = 0.05
     """The threshold for the key to be considered pressed."""
+
+    lookahead_steps: int = 10
+    """The number of steps to look ahead."""
 
     goal_key_visualizer_cfg = VisualizationMarkersCfg(
         prim_path="/Visuals/Command/goal_pos",

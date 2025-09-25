@@ -35,21 +35,6 @@ class PianoSceneCfg(InteractiveSceneCfg):
 
     piano = PIANO_CFG.replace(prim_path="{ENV_REGEX_NS}/piano")
 
-    # a ball just for debugging
-    # ball = AssetBaseCfg(
-    #     prim_path="/World/ball",
-    #     spawn=sim_utils.SphereCfg(
-    #         radius=0.03,
-    #         rigid_props=sim_utils.RigidBodyPropertiesCfg(
-    #             solver_position_iteration_count=4,
-    #             solver_velocity_iteration_count=0,
-    #         ),
-    #         mass_props=sim_utils.MassPropertiesCfg(mass=10.0),
-    #         collision_props=sim_utils.CollisionPropertiesCfg(),
-    #     ),
-    #     init_state=AssetBaseCfg.InitialStateCfg(pos=(0.4, 0.5, 1.0)),
-    # )
-
     # robots
     robot: ArticulationCfg = MISSING
     contact_forces = ContactSensorCfg(
@@ -80,6 +65,7 @@ class CommandsCfg:
         robot_name="robot",
         robot_finger_body_names=["thtip", "fftip", "mftip", "rftip", "lftip"],
         key_close_enough_to_pressed=KEY_CLOSE_ENOUGH_TO_PRESSED,
+        lookahead_steps=10,
         debug_vis=True,
     )
 
