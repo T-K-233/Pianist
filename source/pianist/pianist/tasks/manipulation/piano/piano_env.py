@@ -64,7 +64,7 @@ class CommandsCfg:
         piano_name="piano",
         robot_name="robot",
         robot_finger_body_names=["thtip", "fftip", "mftip", "rftip", "lftip"],
-        key_close_enough_to_pressed=KEY_CLOSE_ENOUGH_TO_PRESSED,
+        key_trigger_threshold=0.70,
         lookahead_steps=10,
         debug_vis=True,
     )

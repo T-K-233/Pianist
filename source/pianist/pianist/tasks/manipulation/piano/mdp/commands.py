@@ -66,10 +66,8 @@ class KeyPressCommand(CommandTerm):
 
         # create buffers
         # discrete command to indicate if the key needs to be pressed
-        # self._key_goal_states = torch.zeros(self.num_envs, 88, dtype=torch.bool, device=self.device)
         self._key_goal_states_lookahead = torch.zeros(self.num_envs, self.cfg.lookahead_steps, 88, dtype=torch.bool, device=self.device)
         # discrete vector with 5 elements (thumb, index, middle, ring, pinky)
-        # self._active_fingers = torch.zeros(self.num_envs, 5, dtype=torch.bool, device=self.device)
         self._active_fingers_lookahead = torch.zeros(self.num_envs, self.cfg.lookahead_steps, 5, dtype=torch.bool, device=self.device)
         # target locations of the keys to be pressed, maximum 10 keys (one for each finger)
         self._key_goal_locations = torch.zeros(self.num_envs, 5, 3, device=self.device)
@@ -96,23 +94,28 @@ class KeyPressCommand(CommandTerm):
 
     @property
     def command(self) -> torch.Tensor:
+        """The command to the robot."""
         # return self.key_goal_states.float()
         return self.key_goal_states_lookahead.flatten(start_dim=1).float()
 
     @property
     def key_goal_states(self) -> torch.Tensor:
+        """The boolean goal key states of the robot."""
         return self._key_goal_states_lookahead[:, 0]
 
     @property
     def key_actual_states(self) -> torch.Tensor:
+        """The actual key states of the robot normalized to [0.0, 1.0]."""
         return self.piano.key_press_states
 
     @property
     def key_goal_locations(self) -> torch.Tensor:
+        """The goal key locations of the robot."""
         return self._key_goal_locations
 
     @property
     def fingertip_positions(self) -> torch.Tensor:
+        """The fingertip positions of the robot."""
         return self.robot.data.body_pos_w[:, self._finger_body_indices]
 
     @property
@@ -128,10 +131,9 @@ class KeyPressCommand(CommandTerm):
         return self._active_fingers_lookahead
 
     def _resample_command(self, env_ids: torch.Tensor):
-        self._song_steps[env_ids] = 0
+        # restart the song at a random frame
+        self._song_steps[env_ids] = torch.randint(0, self.song.num_frames, (env_ids.shape[0],), dtype=torch.int32, device=self.device)
 
-        # self._key_goal_states[env_ids] = 0
-        # self._active_fingers[env_ids] = 0
         self._key_goal_states_lookahead[env_ids] = 0
         self._active_fingers_lookahead[env_ids] = 0
         self._key_goal_locations[env_ids] = 0.0
@@ -149,14 +151,12 @@ class KeyPressCommand(CommandTerm):
         fingerings_current = fingerings_lookahead[:, 0]
         active_fingers_current = active_fingers_lookahead[:, 0]
 
-        # self._key_goal_locations[:] = self.piano.get_key_world_locations(env_ids, keys_indices)
         # create a selection tensor for environment ids to get all the key locations
         env_id_sel = torch.arange(self.num_envs, device=self.device).unsqueeze(1).expand(
             self.num_envs, active_fingers_current.shape[-1]
         )
 
         key_locations = self.piano.data.body_pos_w[env_id_sel, self.piano._key_body_indices[fingerings_current]]
-
         # add the offset from the key rotate joints as the desired contact location
         key_locations += self.piano._key_contact_offsets[fingerings_current]
 
@@ -164,9 +164,6 @@ class KeyPressCommand(CommandTerm):
         self._key_goal_locations[:] = key_locations * active_fingers_current.unsqueeze(-1)
 
     def _update_metrics(self):
-        # compute the error
-        key_on_threshold = self.cfg.key_close_enough_to_pressed
-
         num_active_fingers = self.active_fingers.sum(dim=-1).float()
 
         if self.cfg.robot_name:
@@ -183,19 +180,21 @@ class KeyPressCommand(CommandTerm):
         num_on_keys = on_keys.sum(dim=-1)
         num_off_keys = off_keys.sum(dim=-1)
 
-        # the error between goal and actual for all keys
-        key_joint_pos_errors = torch.abs(self.key_goal_states.float() - self.key_actual_states)
+        pressed_keys = self.key_actual_states > self.cfg.key_trigger_threshold
+        not_pressed_keys = self.key_actual_states < self.cfg.key_trigger_threshold
 
         # compute the number of keys that are correctly pressed and not pressed
-        correctly_pressed_count = ((key_joint_pos_errors < key_on_threshold) * on_keys).sum(dim=-1)
-        correctly_not_pressed_count = ((key_joint_pos_errors < key_on_threshold) * off_keys).sum(dim=-1)
+        correctly_pressed_count = (pressed_keys * on_keys).sum(dim=-1)
+        correctly_not_pressed_count = (not_pressed_keys * off_keys).sum(dim=-1)
 
         correctly_pressed_percentage = correctly_pressed_count.float() / (num_on_keys.float() + 1e-6)
         correctly_not_pressed_percentage = correctly_not_pressed_count.float() / (num_off_keys.float() + 1e-6)
 
-        f1_score = (correctly_pressed_count + correctly_not_pressed_count).float() / ((num_on_keys + num_off_keys).float() + 1e-6)
+        # if there are no keys intended to be pressed, assign all correct to that environment
+        correctly_pressed_percentage[num_on_keys == 0] = 1.0
+        correctly_not_pressed_percentage[num_off_keys == 0] = 1.0
 
-        # print(distance_error, correctly_pressed_count)
+        f1_score = (correctly_pressed_count + correctly_not_pressed_count).float() / ((num_on_keys + num_off_keys).float() + 1e-6)
 
         if self.cfg.robot_name:
             self.metrics["fingertip_to_key_distance"] = distance_error
@@ -277,8 +276,8 @@ class KeyPressCommandCfg(CommandTermCfg):
     slow_down_factor: float = 1.0
     """The factor to slow down the tempo of the song."""
 
-    key_close_enough_to_pressed: float = 0.05
-    """The threshold for the key to be considered pressed."""
+    key_trigger_threshold: float = 0.70
+    """The percentage of position travelled for the key to be considered pressed."""
 
     lookahead_steps: int = 10
     """The number of steps to look ahead."""

@@ -52,7 +52,7 @@ class CommandsCfg:
         piano_name="piano",
         robot_name=None,  # no robot in self-playing mode
         robot_finger_body_names=None,
-        key_close_enough_to_pressed=KEY_CLOSE_ENOUGH_TO_PRESSED,
+        key_trigger_threshold=0.70,
         lookahead_steps=10,
         debug_vis=True,
     )
@@ -85,7 +85,7 @@ class ActionsCfg:
     joint_pos = mdp.JointPositionActionCfg(
         asset_name="piano",
         joint_names=[".*"],
-        scale=0.2,
+        scale=0.1,
         use_default_offset=True,
     )
 
@@ -95,21 +95,28 @@ class RewardsCfg:
     """Reward terms for the MDP."""
 
     # task terms
-    key_on = RewTerm(
-        func=mdp.key_on_reward,
+    key_on_perfect = RewTerm(
+        func=mdp.key_on_perfect_reward,
         params={
             "command_name": "keypress",
-            "key_close_enough_to_pressed": KEY_CLOSE_ENOUGH_TO_PRESSED,
+            "std": 0.01,
         },
         weight=1.0,
     )
-    key_off = RewTerm(
-        func=mdp.key_off_reward,
+    key_off_perfect = RewTerm(
+        func=mdp.key_off_perfect_reward,
         params={
             "command_name": "keypress",
-            "key_close_enough_to_pressed": KEY_CLOSE_ENOUGH_TO_PRESSED,
+            "std": 0.01,
         },
         weight=1.0,
+    )
+    key_position_error = RewTerm(
+        func=mdp.key_position_error,
+        params={
+            "command_name": "keypress",
+        },
+        weight=-0.1,
     )
     energy = RewTerm(
         func=mdp.energy_reward,
@@ -147,7 +154,7 @@ class EventsCfg:
 class SelfPlayingPianoEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the piano environment."""
     # Scene settings
-    scene: SelfPlayingPianoSceneCfg = SelfPlayingPianoSceneCfg(num_envs=1024, env_spacing=2.5)
+    scene: SelfPlayingPianoSceneCfg = SelfPlayingPianoSceneCfg(num_envs=4096, env_spacing=2.5)
 
     # Policy commands
     commands: CommandsCfg = CommandsCfg()

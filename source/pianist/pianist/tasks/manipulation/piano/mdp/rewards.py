@@ -7,6 +7,8 @@ from isaaclab.envs import ManagerBasedRLEnv
 
 from pianist.tasks.manipulation.piano.mdp.commands import KeyPressCommand
 
+# each reward term should return a tensor of shape (num_envs,)
+
 
 def gaussian_sigmoid_func(x: torch.Tensor, value_at_margin: float) -> torch.Tensor:
     """Compute the Gaussian sigmoid function."""
@@ -131,6 +133,36 @@ def key_off_reward(
 #         margin=(_KEY_CLOSE_ENOUGH_TO_PRESSED * 10),
 #         sigmoid="gaussian",
 #     )
+
+
+def key_on_perfect_reward(env: ManagerBasedRLEnv, command_name: str, std: float = 0.01) -> torch.Tensor:
+    """Reward for pressing the right keys at the right time."""
+    command_term: KeyPressCommand = env.command_manager.get_term(command_name)
+
+    on_keys = command_term.key_goal_states
+
+    errors = torch.square(command_term.key_goal_states.float() - command_term.key_actual_states)
+    effective_errors = errors * on_keys
+    return torch.exp(-effective_errors.mean(dim=-1) / std**2)
+
+
+def key_off_perfect_reward(env: ManagerBasedRLEnv, command_name: str, std: float = 0.01) -> torch.Tensor:
+    """Reward for pressing the right keys at the right time."""
+    command_term: KeyPressCommand = env.command_manager.get_term(command_name)
+
+    off_keys = ~command_term.key_goal_states
+
+    errors = torch.square(command_term.key_goal_states.float() - command_term.key_actual_states)
+    effective_errors = errors * off_keys
+    return torch.exp(-effective_errors.mean(dim=-1) / std**2)
+
+
+def key_position_error(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:
+    """Compute the error between the goal and actual key positions."""
+    command_term: KeyPressCommand = env.command_manager.get_term(command_name)
+
+    errors = torch.square(command_term.key_goal_states.float() - command_term.key_actual_states)
+    return errors.sum(dim=-1)
 
 
 def energy_reward(env: ManagerBasedRLEnv, robot_asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
