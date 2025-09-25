@@ -28,6 +28,8 @@ class PianoArticulation(Articulation):
         joint_names = [name + "_joint" for name in self.key_names]
         key_body_indices, _ = self.find_bodies(self.key_names, preserve_order=True)
         key_joint_indices, _ = self.find_joints(joint_names, preserve_order=True)
+
+        # ensure these are 1D tensors
         self._key_body_indices = torch.tensor(key_body_indices, device=self.device)
         self._key_joint_indices = torch.tensor(key_joint_indices, device=self.device)
 
@@ -36,7 +38,7 @@ class PianoArticulation(Articulation):
         # specify the contact position to be at 80% of the key length
         self._key_contact_offsets[WHITE_KEY_INDICES, 0] += -0.8 * WHITE_KEY_LENGTH
         self._key_contact_offsets[BLACK_KEY_INDICES, 0] += -0.8 * BLACK_KEY_LENGTH
-        self._key_contact_offsets[BLACK_KEY_INDICES, 2] += BLACK_KEY_HEIGHT
+        self._key_contact_offsets[BLACK_KEY_INDICES, 2] += 0.2 * BLACK_KEY_HEIGHT
 
         # gives an upward force when the key is at rest
         spring_ref_position = torch.zeros(1, self.num_joints, device=self.device)

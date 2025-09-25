@@ -9,6 +9,7 @@ from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
+from isaaclab.sensors import ContactSensorCfg
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
@@ -34,23 +35,13 @@ class PianoSceneCfg(InteractiveSceneCfg):
 
     piano = PIANO_CFG.replace(prim_path="{ENV_REGEX_NS}/piano")
 
-    # a ball just for debugging
-    # ball = AssetBaseCfg(
-    #     prim_path="/World/ball",
-    #     spawn=sim_utils.SphereCfg(
-    #         radius=0.03,
-    #         rigid_props=sim_utils.RigidBodyPropertiesCfg(
-    #             solver_position_iteration_count=4,
-    #             solver_velocity_iteration_count=0,
-    #         ),
-    #         mass_props=sim_utils.MassPropertiesCfg(mass=10.0),
-    #         collision_props=sim_utils.CollisionPropertiesCfg(),
-    #     ),
-    #     init_state=AssetBaseCfg.InitialStateCfg(pos=(0.4, 0.5, 1.0)),
-    # )
-
     # robots
     robot: ArticulationCfg = MISSING
+    contact_forces = ContactSensorCfg(
+        prim_path="{ENV_REGEX_NS}/robot/.*",
+        history_length=3,
+        track_air_time=False,
+    )
 
     # lights
     light = AssetBaseCfg(
@@ -67,12 +58,14 @@ class PianoSceneCfg(InteractiveSceneCfg):
 class CommandsCfg:
     """Command terms for the MDP."""
 
-    keypress = mdp.RandomKeyPressCommandCfg(
+    keypress = mdp.KeyPressCommandCfg(
+        # song_name="simple",
+        song_name="./source/pianist/data/music/pig_single_finger/nocturne_op9_no_2-1.proto",
         piano_name="piano",
         robot_name="robot",
-        robot_finger_body_names=["ffdistal"],
-        resampling_time_range=(1.0, 4.0),
-        key_close_enough_to_pressed=KEY_CLOSE_ENOUGH_TO_PRESSED,
+        robot_finger_body_names=["thtip", "fftip", "mftip", "rftip", "lftip"],
+        key_trigger_threshold=0.70,
+        lookahead_steps=10,
         debug_vis=True,
     )
 
@@ -86,18 +79,30 @@ class ObservationsCfg:
         """Observations for policy group."""
 
         # observation terms (order preserved)
-        piano_key_goal_state = ObsTerm(func=mdp.generated_commands, params={"command_name": "keypress"})
+        piano_key_goal = ObsTerm(func=mdp.generated_commands, params={"command_name": "keypress"})
+        active_fingers = ObsTerm(func=mdp.active_fingers_lookahead, params={"command_name": "keypress"})
         forearm_pos = ObsTerm(func=mdp.forearm_pos, params={"robot_asset_cfg": SceneEntityCfg("robot")})
         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
-        active_fingers = ObsTerm(func=mdp.active_fingers, params={"command_name": "keypress"})
+        joint_vel = ObsTerm(func=mdp.joint_vel, params={"asset_cfg": SceneEntityCfg("robot")})
         piano_key_positions = ObsTerm(func=mdp.piano_key_pos, params={"piano_asset_cfg": SceneEntityCfg("piano")})
         actions = ObsTerm(func=mdp.last_action)
 
         def __post_init__(self):
             self.enable_corruption = True
 
+    @configclass
+    class CriticCfg(PolicyCfg):
+        """Observations for critic group."""
+
+        # observation terms (order preserved)
+        distance_to_key = ObsTerm(func=mdp.distance_to_key, params={"command_name": "keypress"})
+
+        def __post_init__(self):
+            self.enable_corruption = False
+
     # observation groups
     policy: PolicyCfg = PolicyCfg()
+    critic: CriticCfg = CriticCfg()
 
 
 @configclass
@@ -107,7 +112,7 @@ class ActionsCfg:
     joint_pos = mdp.JointPositionActionCfg(
         asset_name="robot",
         joint_names=[".*"],
-        scale=1.0,
+        scale=0.25,
         preserve_order=True,
         use_default_offset=True,
     )
@@ -118,21 +123,28 @@ class RewardsCfg:
     """Reward terms for the MDP."""
 
     # task terms
-    key_on = RewTerm(
-        func=mdp.key_on_reward,
+    key_on_perfect = RewTerm(
+        func=mdp.key_on_perfect_reward,
         params={
             "command_name": "keypress",
-            "key_close_enough_to_pressed": KEY_CLOSE_ENOUGH_TO_PRESSED,
+            "std": 0.01,
+        },
+        weight=2.0,
+    )
+    key_off_perfect = RewTerm(
+        func=mdp.key_off_perfect_reward,
+        params={
+            "command_name": "keypress",
+            "std": 0.01,
         },
         weight=1.0,
     )
-    key_off = RewTerm(
-        func=mdp.key_off_reward,
+    key_position_error = RewTerm(
+        func=mdp.key_position_error,
         params={
             "command_name": "keypress",
-            "key_close_enough_to_pressed": KEY_CLOSE_ENOUGH_TO_PRESSED,
         },
-        weight=1.0,
+        weight=-0.5,
     )
     energy = RewTerm(
         func=mdp.energy_reward,
@@ -152,6 +164,47 @@ class RewardsCfg:
     #     func=mdp.sustain_pedal_reward,
     #     weight=-1e-4,
     # )
+    action_rate = RewTerm(
+        func=mdp.action_rate_l2,
+        weight=-0.001,
+    )
+    joint_deviation_yaw = RewTerm(
+        func=mdp.joint_deviation_l1,
+        params={
+            "asset_cfg": SceneEntityCfg(
+                "robot",
+                joint_names=[
+                    "WRJ2",
+                ],
+            )
+        },
+        weight=-0.5,
+    )
+    joint_deviation_fingers = RewTerm(
+        func=mdp.joint_deviation_l1,
+        params={
+            "asset_cfg": SceneEntityCfg(
+                "robot",
+                joint_names=[
+                    "(LF|TH)J5",
+                    "(FF|MF|RF|LF|TH)J(4|3|2|1)",
+                ],
+            )
+        },
+        weight=-0.01,
+    )
+    undesired_contacts = RewTerm(
+        func=mdp.undesired_contacts,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=[
+                "palm",
+                ".*proximal",
+                ".*middle",
+            ]),
+            "threshold": 1.0,
+        },
+        weight=-1.0,
+    )
 
 
 @configclass
@@ -206,10 +259,10 @@ class PianoEnvCfg(ManagerBasedRLEnvCfg):
     def __post_init__(self):
         """Post initialization."""
         # general settings
-        self.decimation = 2
+        self.decimation = 5
         self.sim.render_interval = self.decimation
-        self.episode_length_s = 12.0
+        self.episode_length_s = 40.0
         self.viewer.eye = (-0.5, 1.0, 1.3)
         self.viewer.lookat = (0.0, 0.0, 0.5)
         # simulation settings
-        self.sim.dt = 1.0 / 60.0
+        self.sim.dt = 0.01

@@ -5,7 +5,9 @@ from isaaclab.assets import Articulation, RigidObject
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.envs import ManagerBasedRLEnv
 
-from pianist.tasks.manipulation.piano.mdp.commands import RandomKeyPressCommand
+from pianist.tasks.manipulation.piano.mdp.commands import KeyPressCommand
+
+# each reward term should return a tensor of shape (num_envs,)
 
 
 def gaussian_sigmoid_func(x: torch.Tensor, value_at_margin: float) -> torch.Tensor:
@@ -77,15 +79,15 @@ def key_on_reward(
     flexibility in the reward computation.
     """
 
-    command_term: RandomKeyPressCommand = env.command_manager.get_term(command_name)
+    command_term: KeyPressCommand = env.command_manager.get_term(command_name)
 
-    # create a mask for keys that should be pressed (1.0 for keys to press, 0.0 for others)
-    on_keys = command_term.key_press_goals > 0.5
-    # if not on_keys.any():
-    #     return torch.zeros(env.num_envs, device=env.device)
+    # get the keys that should be pressed from command
+    # this is a boolean tensor of shape (num_envs, 88)
+    on_keys = command_term.key_goal_states
 
     # compute the error between goal and actual for all keys
-    errors = command_term.key_press_goals - command_term.key_press_actual
+    # the boolean tensor will be mapped to 0.0 and 1.0
+    errors = on_keys.float() - command_term.key_actual_states
 
     # apply gaussian tolerance to all key errors
     all_key_rewards = gaussian_tolerance(
@@ -94,9 +96,9 @@ def key_on_reward(
         margin=key_close_enough_to_pressed * 10,
     )
 
-    # get the mean reward per environment
-    # only consider rewards for keys that should be pressed
-    rewards = (all_key_rewards * on_keys.float()).sum(dim=-1) / (on_keys.sum(dim=-1).float() + 1e-6)
+    # get the average reward across all keys that should be pressed
+    # use the mask to only consider rewards for keys that should be pressed
+    rewards = (all_key_rewards * on_keys).sum(dim=-1) / (on_keys.sum(dim=-1).float() + 1e-6)
 
     return rewards
 
@@ -107,13 +109,14 @@ def key_off_reward(
     key_close_enough_to_pressed: float = 0.05,
 ) -> torch.Tensor:
     """Reward for not pressing the wrong keys."""
-    command_term: RandomKeyPressCommand = env.command_manager.get_term(command_name)
+    command_term: KeyPressCommand = env.command_manager.get_term(command_name)
 
-    # create a mask for keys that should not be pressed (1.0 for keys to press, 0.0 for others)
-    off_keys = command_term.key_press_goals < 0.5
+    # get the keys that should not be pressed from command
+    # this is a boolean tensor of shape (num_envs, 88)
+    off_keys = ~command_term.key_goal_states
 
     # only consider keys that should not be pressed
-    key_press_actual = command_term.key_press_actual * off_keys.float()
+    key_press_actual = command_term.key_actual_states * off_keys
 
     # if there are any false positives, do not grant any reward
     rewards = (1.0 - (key_press_actual > 0.5).any(dim=-1).float())
@@ -132,6 +135,36 @@ def key_off_reward(
 #     )
 
 
+def key_on_perfect_reward(env: ManagerBasedRLEnv, command_name: str, std: float = 0.01) -> torch.Tensor:
+    """Reward for pressing the right keys at the right time."""
+    command_term: KeyPressCommand = env.command_manager.get_term(command_name)
+
+    on_keys = command_term.key_goal_states
+
+    errors = torch.square(command_term.key_goal_states.float() - command_term.key_actual_states)
+    effective_errors = errors * on_keys
+    return torch.exp(-effective_errors.mean(dim=-1) / std**2)
+
+
+def key_off_perfect_reward(env: ManagerBasedRLEnv, command_name: str, std: float = 0.01) -> torch.Tensor:
+    """Reward for pressing the right keys at the right time."""
+    command_term: KeyPressCommand = env.command_manager.get_term(command_name)
+
+    off_keys = ~command_term.key_goal_states
+
+    errors = torch.square(command_term.key_goal_states.float() - command_term.key_actual_states)
+    effective_errors = errors * off_keys
+    return torch.exp(-effective_errors.mean(dim=-1) / std**2)
+
+
+def key_position_error(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:
+    """Compute the error between the goal and actual key positions."""
+    command_term: KeyPressCommand = env.command_manager.get_term(command_name)
+
+    errors = torch.square(command_term.key_goal_states.float() - command_term.key_actual_states)
+    return errors.sum(dim=-1)
+
+
 def energy_reward(env: ManagerBasedRLEnv, robot_asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     """Reward for minimizing energy."""
     robot: Articulation = env.scene[robot_asset_cfg.name]
@@ -141,23 +174,28 @@ def energy_reward(env: ManagerBasedRLEnv, robot_asset_cfg: SceneEntityCfg = Scen
 
 
 def fingertip_to_key_distances(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg) -> torch.Tensor:
-    """Compute the distances between the fingertip and the key."""
+    """Compute the distances between each of the fingertips and the keys."""
     # extract the asset (to enable type hinting)
     asset: RigidObject = env.scene[asset_cfg.name]
-    command_term: RandomKeyPressCommand = env.command_manager.get_term(command_name)
+    command_term: KeyPressCommand = env.command_manager.get_term(command_name)
 
     # obtain the desired and current positions
-    key_locations = command_term.target_key_locations[:, :, 0:3]
-    fingertip_positions = asset.data.body_pos_w[:, command_term._finger_body_indices]
+    # key_locations and fingertip_positions are tensors of shape (num_envs, 5, 3)
+    key_locations = command_term.key_goal_locations
+    fingertip_positions = command_term.fingertip_positions
 
+    # calculate L2 distance between the fingertip and the key
     distances = torch.norm(fingertip_positions - key_locations, dim=-1)
+
     return distances
 
 
 def fingertip_to_key_distance_l2(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg) -> torch.Tensor:
     """Compute the L2 distance between the fingertip and the key."""
-    distances = fingertip_to_key_distances(env, command_name, asset_cfg)
-    return torch.mean(distances, dim=-1)
+    command_term: KeyPressCommand = env.command_manager.get_term(command_name)
+    all_distances = fingertip_to_key_distances(env, command_name, asset_cfg)
+    distances = torch.sum(command_term.active_fingers * all_distances, dim=-1) / (command_term.active_fingers.sum(dim=-1).float() + 1e-6)
+    return distances
 
 
 def fingertip_to_key_distance_reward(
@@ -167,13 +205,17 @@ def fingertip_to_key_distance_reward(
     finger_close_enough_to_key: float = 0.01,
 ) -> torch.Tensor:
     """Reward for minimizing the distance between the fingertip and the key."""
-    distances = fingertip_to_key_distances(env, command_name, asset_cfg)
+    command_term: KeyPressCommand = env.command_manager.get_term(command_name)
 
-    distance_rewards = gaussian_tolerance(
-        distances.flatten(start_dim=1),
+    # get the distances between all of the fingertips and the keys
+    all_distances = fingertip_to_key_distances(env, command_name, asset_cfg)
+    all_distance_rewards = gaussian_tolerance(
+        all_distances,
         bounds=(0, finger_close_enough_to_key),
         margin=(finger_close_enough_to_key * 10),
     )
-    rewards = distance_rewards.mean(dim=-1)
+    # mask off the rewards for the inactive fingers
+    active_rewards = command_term.active_fingers * all_distance_rewards
+    rewards = active_rewards.sum(dim=-1) / (command_term.active_fingers.sum(dim=-1).float() + 1e-6)
 
     return rewards
