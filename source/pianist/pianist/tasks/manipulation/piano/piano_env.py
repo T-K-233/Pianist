@@ -123,21 +123,28 @@ class RewardsCfg:
     """Reward terms for the MDP."""
 
     # task terms
-    key_on = RewTerm(
-        func=mdp.key_on_reward,
+    key_on_perfect = RewTerm(
+        func=mdp.key_on_perfect_reward,
         params={
             "command_name": "keypress",
-            "key_close_enough_to_pressed": KEY_CLOSE_ENOUGH_TO_PRESSED,
+            "std": 0.01,
         },
         weight=2.0,
     )
-    key_off = RewTerm(
-        func=mdp.key_off_reward,
+    key_off_perfect = RewTerm(
+        func=mdp.key_off_perfect_reward,
         params={
             "command_name": "keypress",
-            "key_close_enough_to_pressed": KEY_CLOSE_ENOUGH_TO_PRESSED,
+            "std": 0.01,
         },
-        weight=0.2,
+        weight=1.0,
+    )
+    key_position_error = RewTerm(
+        func=mdp.key_position_error,
+        params={
+            "command_name": "keypress",
+        },
+        weight=-0.5,
     )
     energy = RewTerm(
         func=mdp.energy_reward,
