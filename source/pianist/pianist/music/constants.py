@@ -57,3 +57,5 @@ MAX_CC_VALUE = 127
 
 MIN_VELOCITY = 0
 MAX_VELOCITY = 127
+
+SF2_PATH = "./source/pianist/data/SalamanderGrandPiano.sf2"
