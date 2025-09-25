@@ -53,6 +53,7 @@ class CommandsCfg:
         robot_name=None,  # no robot in self-playing mode
         robot_finger_body_names=None,
         key_close_enough_to_pressed=KEY_CLOSE_ENOUGH_TO_PRESSED,
+        lookahead_steps=10,
         debug_vis=True,
     )
 
@@ -195,7 +196,7 @@ class SelfPlayingPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         value_loss_coef=1.0,
         use_clipped_value_loss=True,
         clip_param=0.2,
-        entropy_coef=0.005,
+        entropy_coef=0.001,
         num_learning_epochs=5,
         num_mini_batches=4,
         learning_rate=5.0e-4,
