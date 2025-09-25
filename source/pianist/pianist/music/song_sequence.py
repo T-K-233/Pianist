@@ -66,7 +66,7 @@ class SongSequence:
         # stores the fingerings (which finger should press which key)
         self._fingerings = torch.zeros(self.num_frames, 5, dtype=torch.int32, device=device)
 
-    def get_frames(self, frame_indices: torch.Tensor) -> torch.Tensor:
+    def get_frames(self, frame_indices: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         fingerings might not be full, they need to be masked with the active keys.
 
@@ -75,7 +75,7 @@ class SongSequence:
 
         Returns:
             A tuple of the active keys, active fingers, and fingerings.
-            active_keys contains boolean masks of keys among the total 8 keys that should be pressed
+            active_keys contains boolean masks of keys among the total 88 keys that should be pressed
             active_fingers contains boolean masks of fingers among the total 5 fingers that are active (pressing a key)
             fingerings contains the fingerings (which finger should press which key)
         """
