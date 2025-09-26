@@ -148,6 +148,7 @@ class RewardsCfg:
         params={"robot_asset_cfg": SceneEntityCfg("robot")},
         weight=-5e-3,
     )
+    # TODO: also test the l2 reward
     minimize_fingertip_to_key_distance = RewTerm(
         func=mdp.fingertip_to_key_distance_reward,
         params={
@@ -163,7 +164,7 @@ class RewardsCfg:
     # )
     action_rate = RewTerm(
         func=mdp.action_rate_l2,
-        weight=-0.001,
+        weight=-5e-4,
     )
     joint_deviation_yaw = RewTerm(
         func=mdp.joint_deviation_l1,
