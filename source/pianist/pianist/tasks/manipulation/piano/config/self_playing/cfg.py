@@ -15,9 +15,6 @@ import pianist.tasks.manipulation.piano.mdp as mdp
 from pianist.assets.piano_cfg import PIANO_CFG
 
 
-KEY_CLOSE_ENOUGH_TO_PRESSED = 0.05
-
-
 @configclass
 class SelfPlayingPianoSceneCfg(InteractiveSceneCfg):
     """Configuration for the scene with a piano."""
@@ -47,12 +44,10 @@ class CommandsCfg:
     """Command terms for the MDP."""
 
     keypress = mdp.KeyPressCommandCfg(
-        # song_name="simple",
         song_name="./source/pianist/data/music/pig_single_finger/nocturne_op9_no_2-1.proto",
         piano_name="piano",
         robot_name=None,  # no robot in self-playing mode
         robot_finger_body_names=None,
-        key_trigger_threshold=0.70,
         lookahead_steps=10,
         debug_vis=True,
     )
@@ -95,16 +90,16 @@ class RewardsCfg:
     """Reward terms for the MDP."""
 
     # task terms
-    key_on_perfect = RewTerm(
-        func=mdp.key_on_perfect_reward,
+    key_on = RewTerm(
+        func=mdp.key_on_reward,
         params={
             "command_name": "keypress",
             "std": 0.01,
         },
         weight=1.0,
     )
-    key_off_perfect = RewTerm(
-        func=mdp.key_off_perfect_reward,
+    key_off = RewTerm(
+        func=mdp.key_off_reward,
         params={
             "command_name": "keypress",
             "std": 0.01,
@@ -112,7 +107,7 @@ class RewardsCfg:
         weight=1.0,
     )
     key_position_error = RewTerm(
-        func=mdp.key_position_error,
+        func=mdp.key_position_error_l1,
         params={
             "command_name": "keypress",
         },
@@ -144,6 +139,9 @@ class EventsCfg:
     """Configuration for events."""
 
     pass
+
+
+# TODO: curriculum learning on song speed
 
 
 ##

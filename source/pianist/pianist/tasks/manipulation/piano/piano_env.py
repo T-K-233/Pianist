@@ -55,12 +55,10 @@ class CommandsCfg:
     """Command terms for the MDP."""
 
     keypress = mdp.KeyPressCommandCfg(
-        # song_name="simple",
         song_name="./source/pianist/data/music/pig_single_finger/nocturne_op9_no_2-1.proto",
         piano_name="piano",
         robot_name="robot",
         robot_finger_body_names=["thtip", "fftip", "mftip", "rftip", "lftip"],
-        key_trigger_threshold=0.70,
         song_stretch=2,
         lookahead_steps=10,
         debug_vis=True,
@@ -76,12 +74,32 @@ class ObservationsCfg:
         """Observations for policy group."""
 
         # observation terms (order preserved)
-        piano_key_goal = ObsTerm(func=mdp.generated_commands, params={"command_name": "keypress"})
-        active_fingers = ObsTerm(func=mdp.active_fingers_lookahead, params={"command_name": "keypress"})
-        forearm_pos = ObsTerm(func=mdp.forearm_pos, params={"robot_asset_cfg": SceneEntityCfg("robot")})
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
-        joint_vel = ObsTerm(func=mdp.joint_vel, params={"asset_cfg": SceneEntityCfg("robot")})
-        piano_key_positions = ObsTerm(func=mdp.piano_key_pos, params={"piano_asset_cfg": SceneEntityCfg("piano")})
+        piano_key_goal = ObsTerm(
+            func=mdp.generated_commands,
+            params={"command_name": "keypress"},
+        )
+        active_fingers = ObsTerm(
+            func=mdp.active_fingers_lookahead,
+            params={"command_name": "keypress"},
+        )
+        forearm_pos = ObsTerm(
+            func=mdp.forearm_pos,
+            params={"robot_asset_cfg": SceneEntityCfg("robot")},
+        )
+        joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel,
+            noise=Unoise(n_min=-0.05, n_max=0.05),
+        )
+        joint_vel = ObsTerm(
+            func=mdp.joint_vel,
+            params={"asset_cfg": SceneEntityCfg("robot")},
+            noise=Unoise(n_min=-0.1, n_max=0.1),
+        )
+        # TODO: can we get this from real?
+        piano_key_positions = ObsTerm(
+            func=mdp.piano_key_pos,
+            params={"piano_asset_cfg": SceneEntityCfg("piano")},
+        )
         actions = ObsTerm(func=mdp.last_action)
 
         def __post_init__(self):
@@ -92,7 +110,10 @@ class ObservationsCfg:
         """Observations for critic group."""
 
         # observation terms (order preserved)
-        distance_to_key = ObsTerm(func=mdp.distance_to_key, params={"command_name": "keypress"})
+        distance_to_key = ObsTerm(
+            func=mdp.distance_to_key,
+            params={"command_name": "keypress"},
+        )
 
         def __post_init__(self):
             self.enable_corruption = False
@@ -120,16 +141,16 @@ class RewardsCfg:
     """Reward terms for the MDP."""
 
     # task terms
-    key_on_perfect = RewTerm(
-        func=mdp.key_on_perfect_reward,
+    key_on = RewTerm(
+        func=mdp.key_on_reward,
         params={
             "command_name": "keypress",
             "std": 0.01,
         },
         weight=2.0,
     )
-    key_off_perfect = RewTerm(
-        func=mdp.key_off_perfect_reward,
+    key_off = RewTerm(
+        func=mdp.key_off_reward,
         params={
             "command_name": "keypress",
             "std": 0.01,
@@ -137,7 +158,7 @@ class RewardsCfg:
         weight=1.0,
     )
     key_position_error = RewTerm(
-        func=mdp.key_position_error,
+        func=mdp.key_position_error_l1,
         params={
             "command_name": "keypress",
         },
@@ -153,15 +174,11 @@ class RewardsCfg:
         func=mdp.fingertip_to_key_distance_reward,
         params={
             "command_name": "keypress",
-            "asset_cfg": SceneEntityCfg("robot"),
-            "finger_close_enough_to_key": 0.01,
+            "distance_threshold": 0.01,
+            "std": 0.05,
         },
         weight=1.0,
     )
-    # sustain_pedal = RewTerm(
-    #     func=mdp.sustain_pedal_reward,
-    #     weight=-1e-4,
-    # )
     action_rate = RewTerm(
         func=mdp.action_rate_l2,
         weight=-5e-4,
@@ -256,11 +273,12 @@ class PianoEnvCfg(ManagerBasedRLEnvCfg):
 
     def __post_init__(self):
         """Post initialization."""
-        # general settings
-        self.decimation = 5
+        # simulation settings
+        self.sim.dt = 0.01  # 100 Hz physics
+        self.decimation = 5  # 5 Hz policy
         self.sim.render_interval = self.decimation
+        # general settings
         self.episode_length_s = 40.0
+        # viewer settings
         self.viewer.eye = (-0.5, 1.0, 1.3)
         self.viewer.lookat = (0.0, 0.0, 0.5)
-        # simulation settings
-        self.sim.dt = 0.01

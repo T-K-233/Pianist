@@ -11,7 +11,7 @@ from pianist.tasks.manipulation.piano.mdp.math_functions import gaussian, window
 
 # each reward term should return a tensor of shape (num_envs,)
 
-def key_on_perfect_reward(env: ManagerBasedRLEnv, command_name: str, std: float = 0.01) -> torch.Tensor:
+def key_on_reward(env: ManagerBasedRLEnv, command_name: str, std: float = 0.01) -> torch.Tensor:
     """Reward for pressing the right keys at the right time."""
     command_term: KeyPressCommand = env.command_manager.get_term(command_name)
 
@@ -24,8 +24,8 @@ def key_on_perfect_reward(env: ManagerBasedRLEnv, command_name: str, std: float 
     return effective_errors.mean(dim=-1)
 
 
-def key_off_perfect_reward(env: ManagerBasedRLEnv, command_name: str, std: float = 0.01) -> torch.Tensor:
-    """Reward for pressing the right keys at the right time."""
+def key_off_reward(env: ManagerBasedRLEnv, command_name: str, std: float = 0.01) -> torch.Tensor:
+    """Reward for not pressing the wrong keys."""
     command_term: KeyPressCommand = env.command_manager.get_term(command_name)
 
     off_keys = ~command_term.key_goal_states
@@ -46,11 +46,11 @@ def key_off_perfect_reward(env: ManagerBasedRLEnv, command_name: str, std: float
 #     )
 
 
-def key_position_error(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:
-    """Compute the error between the goal and actual key positions."""
+def key_position_error_l1(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:
+    """Compute the L1 error between the goal and actual key positions."""
     command_term: KeyPressCommand = env.command_manager.get_term(command_name)
 
-    errors = torch.square(command_term.key_goal_states.float() - command_term.key_actual_states)
+    errors = torch.abs(command_term.key_goal_states.float() - command_term.key_actual_states)
     return errors.sum(dim=-1)
 
 
@@ -62,10 +62,9 @@ def energy_reward(env: ManagerBasedRLEnv, robot_asset_cfg: SceneEntityCfg = Scen
     return rewards
 
 
-def fingertip_to_key_distances(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+def get_fingertip_to_key_distances(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:
     """Compute the distances between each of the fingertips and the keys."""
     # extract the asset (to enable type hinting)
-    asset: RigidObject = env.scene[asset_cfg.name]
     command_term: KeyPressCommand = env.command_manager.get_term(command_name)
 
     # obtain the desired and current positions
@@ -79,10 +78,10 @@ def fingertip_to_key_distances(env: ManagerBasedRLEnv, command_name: str, asset_
     return distances
 
 
-def fingertip_to_key_distance_l2(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+def fingertip_to_key_distance_l2(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:
     """Compute the L2 distance between the fingertip and the key."""
     command_term: KeyPressCommand = env.command_manager.get_term(command_name)
-    all_distances = fingertip_to_key_distances(env, command_name, asset_cfg)
+    all_distances = get_fingertip_to_key_distances(env, command_name)
     distances = torch.sum(command_term.active_fingers * all_distances, dim=-1) / (command_term.active_fingers.sum(dim=-1).float() + 1e-6)
     return distances
 
@@ -90,19 +89,19 @@ def fingertip_to_key_distance_l2(env: ManagerBasedRLEnv, command_name: str, asse
 def fingertip_to_key_distance_reward(
     env: ManagerBasedRLEnv,
     command_name: str,
-    asset_cfg: SceneEntityCfg,
-    finger_close_enough_to_key: float = 0.01,
+    distance_threshold: float = 0.01,
+    std: float = 0.05,
 ) -> torch.Tensor:
     """Reward for minimizing the distance between the fingertip and the key."""
     command_term: KeyPressCommand = env.command_manager.get_term(command_name)
 
     # get the distances between all of the fingertips and the keys
-    all_distances = fingertip_to_key_distances(env, command_name, asset_cfg)
+    all_distances = get_fingertip_to_key_distances(env, command_name)
     all_distance_rewards = windowed_gaussian(
         all_distances,
         lower=0,
-        upper=finger_close_enough_to_key,
-        std=0.05,
+        upper=distance_threshold,
+        std=std,
     )
     # mask off the rewards for the inactive fingers
     active_rewards = command_term.active_fingers * all_distance_rewards

@@ -55,7 +55,7 @@ class KeyPressCommand(CommandTerm):
 
         # extract the robot and body index for which the command is generated
         self.piano: PianoArticulation = env.scene[self.cfg.piano_name]
-        self.piano.manual_init()
+        self.piano.post_scene_creation_init()  # cannot find a better place to call init
 
         if self.cfg.robot_name:
             self.robot: Articulation = env.scene[self.cfg.robot_name]
@@ -185,8 +185,8 @@ class KeyPressCommand(CommandTerm):
         num_on_keys = on_keys.sum(dim=-1)
         num_off_keys = off_keys.sum(dim=-1)
 
-        pressed_keys = self.key_actual_states > self.cfg.key_trigger_threshold
-        not_pressed_keys = self.key_actual_states < self.cfg.key_trigger_threshold
+        pressed_keys = self.key_actual_states > self.piano.cfg.key_trigger_threshold
+        not_pressed_keys = self.key_actual_states < self.piano.cfg.key_trigger_threshold
 
         # compute the number of keys that are correctly pressed and not pressed
         correctly_pressed_count = (pressed_keys * on_keys).sum(dim=-1)
@@ -283,9 +283,6 @@ class KeyPressCommandCfg(CommandTermCfg):
 
     song_stretch: float = 1.0
     """The factor to slow down the tempo of the song."""
-
-    key_trigger_threshold: float = 0.70
-    """The percentage of position travelled for the key to be considered pressed."""
 
     lookahead_steps: int = 10
     """The number of steps to look ahead."""

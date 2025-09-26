@@ -10,14 +10,19 @@ from pianist.assets.piano_constants import (
     WHITE_KEY_LENGTH,
     BLACK_KEY_LENGTH,
     BLACK_KEY_HEIGHT,
+    KEY_TRIGGER_THRESHOLD,
 )
 
 
 class PianoArticulation(Articulation):
-    def __init__(self, cfg: ArticulationCfg):
+    def __init__(self, cfg: "PianoArticulationCfg"):
         super().__init__(cfg)
 
-    def manual_init(self):
+        # add type hinting
+        self.cfg: PianoArticulationCfg
+
+    def post_scene_creation_init(self):
+        # we need to do these initializations manually after the scene is created.
         self.key_names = []
         for i in range(NUM_KEYS):
             if i in WHITE_KEY_INDICES:
@@ -67,3 +72,6 @@ class PianoArticulationCfg(ArticulationCfg):
     ##
 
     class_type: type = PianoArticulation
+
+    # TODO: currently we are using position as trigger, perhaps change to velocity?
+    key_trigger_threshold: float = KEY_TRIGGER_THRESHOLD
