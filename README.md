@@ -25,4 +25,11 @@ uv run ./scripts/zero_agent.py --task Piano-Shadow-v0 --num_envs 4
 
 ```bash
 uv run ./scripts/rsl_rl/train.py --task Piano-Shadow-v0 --headless --logger wandb --log_project_name Pianist --run_name more_paper_rew
+uv run ./scripts/rsl_rl/train.py --task Piano-Self-Playing-v0 --headless --logger wandb --log_project_name Pianist --run_name more_paper_rew
+```
+
+
+```bash
+sudo apt install portaudio19-dev
+sudo apt install fluidsynth
 ```

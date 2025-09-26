@@ -12,7 +12,6 @@ class ShadowHandCfg(PianoEnvCfg):
         super().__post_init__()
 
         self.scene.robot = SHADOW_HAND_CFG.replace(prim_path="{ENV_REGEX_NS}/robot")
-        # self.scene.robot.init_state.pos = (-0.35, 0.0, 0.6)
         self.scene.robot.init_state.pos = (-0.4, 0.0, 0.55)
 
 
