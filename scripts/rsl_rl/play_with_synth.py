@@ -117,16 +117,14 @@ def main():
             # env stepping
             obs, _, _, _ = env.step(actions)
 
-            pressed_keys = torch.where(env.unwrapped.scene["piano"].key_press_states[0, :] > 0.8)[0].tolist()
+            pressed_keys = torch.where(env.unwrapped.scene["piano"].key_press_states[0, :] > 0.7)[0].tolist()
             for key_index in pressed_keys:
                 if key_index not in prev_pressed_keys:
                     note_index = key_index + midi_offset
                     synth.note_on(note_index, 127)
-                    print(f"Note on: {note_index}")
             for key_index in prev_pressed_keys:
                 if key_index not in pressed_keys:
                     synth.note_off(key_index)
-                    print(f"Note off: {key_index}")
             prev_pressed_keys = pressed_keys
 
     # close the simulator

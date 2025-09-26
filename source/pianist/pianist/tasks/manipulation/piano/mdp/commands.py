@@ -44,8 +44,7 @@ class KeyPressCommand(CommandTerm):
 
         if self.cfg.song_name.endswith(".proto"):
             # HACK: slow down the tempo
-            self.song = SongSequence.from_midi(self.cfg.song_name, dt=env.step_dt * self.cfg.slow_down_factor, device=self.device)
-            # self.song = SongSequence.from_midi(self.cfg.song_name, dt=env.step_dt, device=self.device)
+            self.song = SongSequence.from_midi(self.cfg.song_name, dt=env.step_dt, device=self.device, stretch_factor=self.cfg.song_stretch)
         elif self.cfg.song_name == "simple":
             self.song = SongSequence.from_simple(num_frames=40, dt=env.step_dt, device=self.device)
         elif self.cfg.song_name == "random":
@@ -282,7 +281,7 @@ class KeyPressCommandCfg(CommandTermCfg):
     robot_finger_body_names: list[str] = MISSING
     """Names of the robot finger bodies for which the commands are generated."""
 
-    slow_down_factor: float = 1.0
+    song_stretch: float = 1.0
     """The factor to slow down the tempo of the song."""
 
     key_trigger_threshold: float = 0.70

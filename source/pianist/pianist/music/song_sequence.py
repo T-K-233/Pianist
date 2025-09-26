@@ -35,8 +35,9 @@ class SongSequence:
         return cls(num_frames, dt, device)
 
     @classmethod
-    def from_midi(cls, midi_file: str, dt: float, device: torch.device) -> "SongSequence":
+    def from_midi(cls, midi_file: str, dt: float, device: torch.device, stretch_factor: float = 1.0) -> "SongSequence":
         midi = MidiFile.from_file(midi_file)
+        midi = midi.stretch(stretch_factor)
         trajectory = NoteTrajectory.from_midi(midi, dt=dt)  # HACK: slow down the tempo
         trajectory = trajectory.trim_silence()
         num_frames = len(trajectory)

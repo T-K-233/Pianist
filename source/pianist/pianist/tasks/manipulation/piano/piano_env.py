@@ -18,10 +18,6 @@ import pianist.tasks.manipulation.piano.mdp as mdp
 from pianist.assets.piano_cfg import PIANO_CFG
 
 
-FINGER_CLOSE_ENOUGH_TO_KEY = 0.01
-KEY_CLOSE_ENOUGH_TO_PRESSED = 0.05
-
-
 @configclass
 class PianoSceneCfg(InteractiveSceneCfg):
     """Configuration for the scene with a piano."""
@@ -65,6 +61,7 @@ class CommandsCfg:
         robot_name="robot",
         robot_finger_body_names=["thtip", "fftip", "mftip", "rftip", "lftip"],
         key_trigger_threshold=0.70,
+        song_stretch=2,
         lookahead_steps=10,
         debug_vis=True,
     )
@@ -156,7 +153,7 @@ class RewardsCfg:
         params={
             "command_name": "keypress",
             "asset_cfg": SceneEntityCfg("robot"),
-            "finger_close_enough_to_key": FINGER_CLOSE_ENOUGH_TO_KEY,
+            "finger_close_enough_to_key": 0.01,
         },
         weight=1.0,
     )
@@ -236,7 +233,7 @@ class EventCfg:
 class PianoEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the piano environment."""
     # Scene settings
-    scene: PianoSceneCfg = PianoSceneCfg(num_envs=1024, env_spacing=2.5)
+    scene: PianoSceneCfg = PianoSceneCfg(num_envs=4096, env_spacing=2.5)
 
     # Policy commands
     commands: CommandsCfg = CommandsCfg()

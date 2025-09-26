@@ -128,7 +128,7 @@ class RewardsCfg:
     joint_deviation = RewTerm(
         func=mdp.joint_deviation_l1,
         params={"asset_cfg": SceneEntityCfg("piano", joint_names=[".*"])},
-        weight=-0.5,
+        weight=-1.0,
     )
 
 
