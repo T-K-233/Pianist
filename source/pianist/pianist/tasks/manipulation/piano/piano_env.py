@@ -145,7 +145,7 @@ class RewardsCfg:
         func=mdp.key_on_reward,
         params={
             "command_name": "keypress",
-            "std": 0.01,
+            "std": 0.02,
         },
         weight=2.0,
     )
@@ -153,7 +153,7 @@ class RewardsCfg:
         func=mdp.key_off_reward,
         params={
             "command_name": "keypress",
-            "std": 0.01,
+            "std": 0.02,
         },
         weight=1.0,
     )

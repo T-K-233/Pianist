@@ -21,7 +21,10 @@ def key_on_reward(env: ManagerBasedRLEnv, command_name: str, std: float = 0.01) 
     # return torch.exp(-effective_errors.mean(dim=-1) / std**2)
     errors = gaussian(command_term.key_actual_states, command_term.key_goal_states.float(), std)
     effective_errors = errors * on_keys
-    return effective_errors.mean(dim=-1)
+
+    # get the mean across all on keys
+    effective_errors = effective_errors.sum(dim=-1) / (on_keys.sum(dim=-1).float() + 1e-6)
+    return effective_errors
 
 
 def key_off_reward(env: ManagerBasedRLEnv, command_name: str, std: float = 0.01) -> torch.Tensor:
@@ -32,7 +35,10 @@ def key_off_reward(env: ManagerBasedRLEnv, command_name: str, std: float = 0.01)
 
     errors = gaussian(command_term.key_actual_states, command_term.key_goal_states.float(), std)
     effective_errors = errors * off_keys
-    return effective_errors.mean(dim=-1)
+
+    # get the mean across all off keys
+    effective_errors = effective_errors.sum(dim=-1) / (off_keys.sum(dim=-1).float() + 1e-6)
+    return effective_errors
 
 
 # def sustain_reward(self, physics) -> float:
