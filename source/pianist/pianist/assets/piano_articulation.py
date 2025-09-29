@@ -47,7 +47,7 @@ class PianoArticulation(Articulation):
 
         # gives an upward force when the key is at rest
         spring_ref_position = torch.zeros(1, self.num_joints, device=self.device)
-        spring_ref_position[:] = -0.017453292519943295
+        spring_ref_position[:] = -0.2
         self.set_joint_position_target(spring_ref_position)
 
     @property
