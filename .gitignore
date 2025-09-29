@@ -37,3 +37,6 @@ _build
 
 # ignore source music files
 source/pianist/data/music/*
+
+# ignore sound files
+source/pianist/data/**/*.sf2

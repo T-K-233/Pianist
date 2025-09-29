@@ -10,14 +10,19 @@ from pianist.assets.piano_constants import (
     WHITE_KEY_LENGTH,
     BLACK_KEY_LENGTH,
     BLACK_KEY_HEIGHT,
+    KEY_TRIGGER_THRESHOLD,
 )
 
 
 class PianoArticulation(Articulation):
-    def __init__(self, cfg: ArticulationCfg):
+    def __init__(self, cfg: "PianoArticulationCfg"):
         super().__init__(cfg)
 
-    def manual_init(self):
+        # add type hinting
+        self.cfg: PianoArticulationCfg
+
+    def post_scene_creation_init(self):
+        # we need to do these initializations manually after the scene is created.
         self.key_names = []
         for i in range(NUM_KEYS):
             if i in WHITE_KEY_INDICES:
@@ -28,6 +33,8 @@ class PianoArticulation(Articulation):
         joint_names = [name + "_joint" for name in self.key_names]
         key_body_indices, _ = self.find_bodies(self.key_names, preserve_order=True)
         key_joint_indices, _ = self.find_joints(joint_names, preserve_order=True)
+
+        # ensure these are 1D tensors
         self._key_body_indices = torch.tensor(key_body_indices, device=self.device)
         self._key_joint_indices = torch.tensor(key_joint_indices, device=self.device)
 
@@ -36,7 +43,7 @@ class PianoArticulation(Articulation):
         # specify the contact position to be at 80% of the key length
         self._key_contact_offsets[WHITE_KEY_INDICES, 0] += -0.8 * WHITE_KEY_LENGTH
         self._key_contact_offsets[BLACK_KEY_INDICES, 0] += -0.8 * BLACK_KEY_LENGTH
-        self._key_contact_offsets[BLACK_KEY_INDICES, 2] += BLACK_KEY_HEIGHT
+        self._key_contact_offsets[BLACK_KEY_INDICES, 2] += 0.2 * BLACK_KEY_HEIGHT
 
         # gives an upward force when the key is at rest
         spring_ref_position = torch.zeros(1, self.num_joints, device=self.device)
@@ -65,3 +72,6 @@ class PianoArticulationCfg(ArticulationCfg):
     ##
 
     class_type: type = PianoArticulation
+
+    # TODO: currently we are using position as trigger, perhaps change to velocity?
+    key_trigger_threshold: float = KEY_TRIGGER_THRESHOLD

@@ -27,11 +27,56 @@ from pathlib import Path
 from typing import List, Tuple, Union
 
 import numpy as np
+from note_seq import NoteSequence, midi_io, midi_synth, music_pb2, sequences_lib
 from note_seq import NoteSequence, midi_io, music_pb2, sequences_lib
 from note_seq import constants as ns_constants
 
 from pianist.music import constants as consts
 from pianist.music.piano_roll import sequence_to_pianoroll
+
+import time
+import pyaudio
+
+
+def play_sound(
+    waveform: np.ndarray, sampling_rate: int = consts.SAMPLING_RATE, chunk: int = 1024
+) -> None:
+    """Play a waveform using PyAudio."""
+    if waveform.dtype != np.int16:
+        raise ValueError("waveform must be an np.int16 array.")
+
+    # An iterator that yields chunks of audio data.
+    def chunkifier():
+        for i in range(0, len(waveform), chunk):
+            yield waveform[i : i + chunk]
+
+    audio_generator = chunkifier()
+
+    def callback_fn(in_data, frame_count, time_info, status):
+        del in_data, frame_count, time_info, status
+        return (next(audio_generator), pyaudio.paContinue)
+
+    p = pyaudio.PyAudio()
+
+    stream = p.open(
+        format=pyaudio.paInt16,
+        channels=1,
+        rate=sampling_rate,
+        output=True,
+        frames_per_buffer=chunk,
+        stream_callback=callback_fn,
+    )
+
+    try:
+        stream.start_stream()
+        while stream.is_active():
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        print("Ctrl-C detected. Stopping playback.")
+    finally:
+        stream.stop_stream()
+        stream.close()
+        p.terminate()
 
 
 def note_name_to_midi_number(name: str) -> int:
@@ -234,18 +279,18 @@ class MidiFile:
         )
         return MidiFile(seq=seq)
 
-    # def synthesize(self, sampling_rate: int = consts.SAMPLING_RATE) -> np.ndarray:
-    #     """Synthesize the MIDI file into a waveform using FluidSynth."""
-    #     return midi_synth.fluidsynth(
-    #         self.seq, sample_rate=float(sampling_rate), sf2_path=str(SF2_PATH)
-    #     )
+    def synthesize(self, sampling_rate: int = consts.SAMPLING_RATE) -> np.ndarray:
+        """Synthesize the MIDI file into a waveform using FluidSynth."""
+        return midi_synth.fluidsynth(
+            self.seq, sample_rate=float(sampling_rate), sf2_path=str(consts.SF2_PATH)
+        )
 
-    # def play(self, sampling_rate: int = consts.SAMPLING_RATE) -> None:
-    #     """Play the MIDI file using FluidSynth and PyAudio."""
-    #     waveform_float = self.synthesize()
-    #     normalizer = float(np.iinfo(np.int16).max)
-    #     waveform = np.array(np.asarray(waveform_float) * normalizer, dtype=np.int16)
-    #     audio.play_sound(waveform, sampling_rate=sampling_rate)
+    def play(self, sampling_rate: int = consts.SAMPLING_RATE) -> None:
+        """Play the MIDI file using FluidSynth and PyAudio."""
+        waveform_float = self.synthesize()
+        normalizer = float(np.iinfo(np.int16).max)
+        waveform = np.array(np.asarray(waveform_float) * normalizer, dtype=np.int16)
+        play_sound(waveform, sampling_rate=sampling_rate)
 
     def has_fingering(self) -> bool:
         """Returns whether the MIDI file has fingering information."""

@@ -37,7 +37,6 @@ import os
 
 import gymnasium as gym
 import torch
-import mido
 from rsl_rl.runners import OnPolicyRunner
 from isaaclab.envs import DirectMARLEnv, multi_agent_to_single_agent
 from isaaclab.utils.dict import print_dict
@@ -46,6 +45,7 @@ from isaaclab_tasks.utils import get_checkpoint_path, parse_env_cfg
 
 # Import extensions to set up environment tasks
 import pianist.tasks  # noqa: F401
+from pianist.music.synthesizer import Synthesizer
 
 
 def main():
@@ -101,9 +101,8 @@ def main():
     #     ppo_runner.alg.actor_critic, normalizer=ppo_runner.obs_normalizer, path=export_model_dir, filename="policy.onnx"
     # )
 
-    midi_port = "Piano MIDI Device:Piano MIDI Device Digital Piano 24:0"
-
-    outport = mido.open_output(midi_port)
+    synth = Synthesizer()
+    synth.start()
     prev_pressed_keys = []
     midi_offset = 21
 
@@ -124,10 +123,10 @@ def main():
             for key_index in pressed_keys:
                 if key_index not in prev_pressed_keys:
                     note_index = key_index + midi_offset
-                    outport.send(mido.Message("note_on", note=note_index, velocity=127, channel=0))
+                    synth.note_on(note_index, 127)
             for key_index in prev_pressed_keys:
                 if key_index not in pressed_keys:
-                    outport.send(mido.Message("note_off", note=key_index, velocity=127, channel=0))
+                    synth.note_off(key_index)
             prev_pressed_keys = pressed_keys
 
     # close the simulator

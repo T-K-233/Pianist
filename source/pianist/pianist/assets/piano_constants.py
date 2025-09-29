@@ -97,3 +97,7 @@ BLACK_KEY_INDICES = BLACK_TWIN_KEY_INDICES + BLACK_TRIPLET_KEY_INDICES
 
 TWIN_INDICES = list(range(2, NUM_WHITE_KEYS - 1, 7))
 TRIPLET_INDICES = list(range(5, NUM_WHITE_KEYS - 1, 7))
+
+# TODO: currently we are using position as trigger, perhaps change to velocity?
+KEY_TRIGGER_THRESHOLD = 0.70
+"""The percentage of position travelled for the key to be considered pressed."""
