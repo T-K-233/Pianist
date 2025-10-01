@@ -62,9 +62,9 @@ class ObservationsCfg:
         """Observations for policy group."""
 
         # observation terms (order preserved)
-        piano_key_goal = ObsTerm(func=mdp.generated_commands, params={"command_name": "keypress"})
+        key_goal_states = ObsTerm(func=mdp.generated_commands, params={"command_name": "keypress"})
         active_fingers = ObsTerm(func=mdp.active_fingers, params={"command_name": "keypress"})
-        piano_key_positions = ObsTerm(func=mdp.piano_key_pos, params={"piano_asset_cfg": SceneEntityCfg("piano")})
+        key_current_positions = ObsTerm(func=mdp.piano_key_current_positions, params={"piano_asset_cfg": SceneEntityCfg("piano")})
 
         def __post_init__(self):
             self.enable_corruption = True

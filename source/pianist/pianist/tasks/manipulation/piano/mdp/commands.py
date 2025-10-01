@@ -105,13 +105,8 @@ class KeyPressCommand(CommandTerm):
 
     @property
     def key_goal_states(self) -> torch.Tensor:
-        """The boolean goal key states of the robot."""
+        """The boolean goal key pressed states."""
         return self._key_goal_states_lookahead[:, 0]
-
-    @property
-    def key_actual_states(self) -> torch.Tensor:
-        """The actual key states of the robot normalized to [0.0, 1.0]."""
-        return self.piano.key_press_states
 
     @property
     def key_goal_locations(self) -> torch.Tensor:
@@ -138,6 +133,7 @@ class KeyPressCommand(CommandTerm):
     def _resample_command(self, env_ids: torch.Tensor):
         # restart the song at a random frame
         self._song_steps[env_ids] = torch.randint(0, self.song.num_frames, (env_ids.shape[0],), dtype=torch.int32, device=self.device)
+        # self._song_steps[env_ids] = 0  # for eval
 
         self._key_goal_states_lookahead[env_ids] = 0
         self._active_fingers_lookahead[env_ids] = 0
@@ -185,8 +181,8 @@ class KeyPressCommand(CommandTerm):
         num_on_keys = on_keys.sum(dim=-1)
         num_off_keys = off_keys.sum(dim=-1)
 
-        pressed_keys = self.key_actual_states > self.piano.cfg.key_trigger_threshold
-        not_pressed_keys = self.key_actual_states < self.piano.cfg.key_trigger_threshold
+        pressed_keys = self.piano.key_states
+        not_pressed_keys = ~self.piano.key_states
 
         # compute the number of keys that are correctly pressed and not pressed
         correctly_pressed_count = (pressed_keys * on_keys).sum(dim=-1)

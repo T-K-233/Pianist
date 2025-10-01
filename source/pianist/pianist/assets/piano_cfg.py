@@ -30,9 +30,9 @@ PIANO_CFG = PianoArticulationCfg(
     actuators={
         ".*": ImplicitActuatorCfg(
             joint_names_expr=[".*"],
-            effort_limit_sim={".*": 0.05},
-            stiffness={".*": 2.0},
-            damping={".*": 0.05},
+            effort_limit_sim={".*": 0.15},
+            stiffness={".*": 0.5},
+            damping={".*": 0.0273},
             armature={".*": 0.001},
             # TODO: how to implement springref=-0.017453292519943295??
         ),
