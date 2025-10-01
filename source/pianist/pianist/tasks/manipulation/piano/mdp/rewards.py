@@ -1,10 +1,10 @@
 import torch
-from typing import Tuple
 
-from isaaclab.assets import Articulation, RigidObject
+from isaaclab.assets import Articulation
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.envs import ManagerBasedRLEnv
 
+from pianist.assets.piano_articulation import PianoArticulation
 from pianist.tasks.manipulation.piano.mdp.commands import KeyPressCommand
 from pianist.tasks.manipulation.piano.mdp.math_functions import gaussian, windowed_gaussian
 
@@ -52,11 +52,12 @@ def key_off_reward(env: ManagerBasedRLEnv, command_name: str, std: float = 0.01)
 #     )
 
 
-def key_position_error_l1(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:
+def key_position_error_l1(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg = SceneEntityCfg("piano")) -> torch.Tensor:
     """Compute the L1 error between the goal and actual key positions."""
     command_term: KeyPressCommand = env.command_manager.get_term(command_name)
+    piano: PianoArticulation = env.scene[asset_cfg.name]
 
-    errors = torch.abs(command_term.key_goal_states.float() - command_term.key_actual_states)
+    errors = torch.abs(command_term.key_goal_states.float() - piano.key_positions)
     return errors.sum(dim=-1)
 
 

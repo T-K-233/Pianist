@@ -51,9 +51,15 @@ class PianoArticulation(Articulation):
         self.set_joint_position_target(spring_ref_position)
 
     @property
-    def key_press_states(self) -> torch.Tensor:
+    def key_positions(self) -> torch.Tensor:
+        """The normalized key press joint positions."""
         key_press_normalized = self.data.joint_pos / self.data.default_joint_pos_limits[:, :, 1]
         return key_press_normalized[:, self._key_joint_indices]
+
+    @property
+    def key_states(self) -> torch.Tensor:
+        """The boolean key pressed states."""
+        return self.key_positions > self.cfg.key_trigger_threshold
 
     def get_key_world_locations(self, env_ids: torch.Tensor, key_indices: torch.Tensor) -> torch.Tensor:
         key_locations = self.data.body_pos_w[env_ids, self._key_body_indices[key_indices]]

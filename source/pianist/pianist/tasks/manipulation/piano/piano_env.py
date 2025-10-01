@@ -74,7 +74,7 @@ class ObservationsCfg:
         """Observations for policy group."""
 
         # observation terms (order preserved)
-        piano_key_goal = ObsTerm(
+        key_goal_states = ObsTerm(
             func=mdp.generated_commands,
             params={"command_name": "keypress"},
         )
@@ -82,9 +82,10 @@ class ObservationsCfg:
             func=mdp.active_fingers_lookahead,
             params={"command_name": "keypress"},
         )
-        forearm_pos = ObsTerm(
+        forearm_3d_pos = ObsTerm(
             func=mdp.forearm_pos,
             params={"robot_asset_cfg": SceneEntityCfg("robot")},
+            # noise=Unoise(n_min=-0.01, n_max=0.01),
         )
         joint_pos = ObsTerm(
             func=mdp.joint_pos_rel,
@@ -95,9 +96,8 @@ class ObservationsCfg:
             params={"asset_cfg": SceneEntityCfg("robot")},
             noise=Unoise(n_min=-0.1, n_max=0.1),
         )
-        # TODO: can we get this from real?
-        piano_key_positions = ObsTerm(
-            func=mdp.piano_key_pos,
+        key_current_states = ObsTerm(
+            func=mdp.piano_key_current_states,
             params={"piano_asset_cfg": SceneEntityCfg("piano")},
         )
         actions = ObsTerm(func=mdp.last_action)
@@ -113,6 +113,11 @@ class ObservationsCfg:
         distance_to_key = ObsTerm(
             func=mdp.distance_to_key,
             params={"command_name": "keypress"},
+        )
+        # TODO: can we get this from real?
+        key_current_positions = ObsTerm(
+            func=mdp.piano_key_current_positions,
+            params={"piano_asset_cfg": SceneEntityCfg("piano")},
         )
 
         def __post_init__(self):
@@ -141,28 +146,29 @@ class RewardsCfg:
     """Reward terms for the MDP."""
 
     # task terms
-    key_on = RewTerm(
-        func=mdp.key_on_reward,
-        params={
-            "command_name": "keypress",
-            "std": 0.02,
-        },
-        weight=2.0,
-    )
-    key_off = RewTerm(
-        func=mdp.key_off_reward,
-        params={
-            "command_name": "keypress",
-            "std": 0.02,
-        },
-        weight=1.0,
-    )
+    # key_on = RewTerm(
+    #     func=mdp.key_on_reward,
+    #     params={
+    #         "command_name": "keypress",
+    #         "std": 0.01,
+    #     },
+    #     weight=2.0,
+    # )
+    # key_off = RewTerm(
+    #     func=mdp.key_off_reward,
+    #     params={
+    #         "command_name": "keypress",
+    #         "std": 0.01,
+    #     },
+    #     weight=1.0,
+    # )
     key_position_error = RewTerm(
         func=mdp.key_position_error_l1,
         params={
             "command_name": "keypress",
+            "asset_cfg": SceneEntityCfg("piano"),
         },
-        weight=-0.5,
+        weight=-1.0,
     )
     energy = RewTerm(
         func=mdp.energy_reward,
@@ -179,6 +185,13 @@ class RewardsCfg:
         },
         weight=1.0,
     )
+    # minimize_fingertip_to_key_distance = RewTerm(
+    #     func=mdp.fingertip_to_key_distance_l2,
+    #     params={
+    #         "command_name": "keypress",
+    #     },
+    #     weight=1.0,
+    # )
     action_rate = RewTerm(
         func=mdp.action_rate_l2,
         weight=-5e-4,

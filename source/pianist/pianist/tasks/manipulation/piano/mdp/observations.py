@@ -32,22 +32,25 @@ def active_fingers_lookahead(env: ManagerBasedEnv, command_name: str) -> torch.T
 
 
 def forearm_pos(env: ManagerBasedEnv, robot_asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
-    """The position of the forearm w.r.t. the world.
-    """
+    """The position of the forearm w.r.t. the world."""
     # extract the used quantities (to enable type-hinting)
     asset: Articulation = env.scene[robot_asset_cfg.name]
     body_index, _ = asset.find_bodies(["forearm"])
     return asset.data.body_pos_w[:, body_index].squeeze(1)
 
 
-def piano_key_pos(env: ManagerBasedEnv, piano_asset_cfg: SceneEntityCfg = SceneEntityCfg("piano")) -> torch.Tensor:
-    """The joint positions of the asset w.r.t. the default joint positions.
-
-    Note: Only the joints configured in :attr:`piano_asset_cfg.joint_ids` will have their positions returned.
-    """
+def piano_key_current_positions(env: ManagerBasedEnv, piano_asset_cfg: SceneEntityCfg = SceneEntityCfg("piano")) -> torch.Tensor:
+    """The joint positions of the asset w.r.t. the default joint positions."""
     # extract the used quantities (to enable type-hinting)
     asset: PianoArticulation = env.scene[piano_asset_cfg.name]
-    return asset.key_press_states
+    return asset.key_positions
+
+
+def piano_key_current_states(env: ManagerBasedEnv, piano_asset_cfg: SceneEntityCfg = SceneEntityCfg("piano")) -> torch.Tensor:
+    """The boolean key pressed states of the asset."""
+    # extract the used quantities (to enable type-hinting)
+    asset: PianoArticulation = env.scene[piano_asset_cfg.name]
+    return asset.key_states.float()
 
 
 def distance_to_key(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
